@@ -17,7 +17,7 @@ export type VerifiedBurnsGetBody = {
 };
 
 function serverBurnLog(message: string): void {
-  console.info(`[MoginHood server] ${message}`);
+  console.info(`[MoginHood] ${message}`);
 }
 
 export function verifiedBurnsGetBody(
@@ -79,46 +79,74 @@ export async function handleVerifiedBurnsRequest(input: {
   records: BurnRecord[];
   rpcUrl: string;
   persist?: (record: BurnRecord) => BurnRecord[];
+  verify?: typeof verifyBurnSignature;
 }): Promise<{ status: number; body: unknown }> {
-  if (input.httpMethod === 'GET') {
-    return { status: 200, body: verifiedBurnsGetBody(input.records, input.persistence) };
-  }
-
-  if (input.httpMethod !== 'POST') {
-    return { status: 405, body: { error: 'Method not allowed' } };
-  }
-
-  if (!input.rpcUrl.trim()) {
-    serverBurnLog('verification failed: RPC not configured');
-    return { status: 503, body: { error: 'Solana RPC endpoint is not configured.' } };
-  }
-
-  const signature =
-    input.body && typeof input.body === 'object' && !Array.isArray(input.body)
-      ? typeof (input.body as { signature?: unknown }).signature === 'string'
-        ? (input.body as { signature: string }).signature.trim()
-        : ''
-      : '';
-  if (!signature) {
-    serverBurnLog('verification failed: missing signature');
-    return { status: 400, body: { error: 'Missing transaction signature.' } };
-  }
-
   try {
+    if (input.httpMethod === 'GET') {
+      if (input.persistence === 'inactive') {
+        serverBurnLog('burn persistence: inactive');
+      }
+      return { status: 200, body: verifiedBurnsGetBody(input.records, input.persistence) };
+    }
+
+    if (input.httpMethod !== 'POST') {
+      return { status: 405, body: { error: 'Method not allowed', persistence: input.persistence } };
+    }
+
+    const signature =
+      input.body && typeof input.body === 'object' && !Array.isArray(input.body)
+        ? typeof (input.body as { signature?: unknown }).signature === 'string'
+          ? (input.body as { signature: string }).signature.trim()
+          : ''
+        : '';
+    if (!signature) {
+      serverBurnLog('verification failed: missing signature');
+      return {
+        status: 400,
+        body: { verified: false, persistence: input.persistence, error: 'Missing transaction signature.' },
+      };
+    }
+
+    if (!input.rpcUrl.trim()) {
+      serverBurnLog('burn persistence: inactive');
+      return {
+        status: 200,
+        body: {
+          verified: false,
+          persistence: 'inactive',
+          error: 'Solana RPC endpoint is not configured.',
+        },
+      };
+    }
+
+    const verify = input.verify ?? verifyBurnSignature;
     const existing = input.persistence === 'inactive' ? [] : input.records;
-    const result = await verifyBurnSignature({ signature, rpcUrl: input.rpcUrl, existing });
+    const result = await verify({ signature, rpcUrl: input.rpcUrl, existing });
     if (input.persistence === 'local' && input.persist && result.added) {
       input.persist(result.record);
       serverBurnLog('record stored');
+    } else if (input.persistence === 'inactive') {
+      serverBurnLog('burn persistence: inactive');
     }
-    const persisted = input.persistence === 'local';
     return {
-      status: result.added && persisted ? 201 : 200,
-      body: { record: result.record, added: result.added && persisted, persisted },
+      status: 200,
+      body: {
+        verified: true,
+        record: result.record,
+        persistence: input.persistence,
+        added: Boolean(result.added && input.persistence === 'local'),
+      },
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : 'The forest could not confirm the burn.';
+    if (input.httpMethod === 'GET') {
+      serverBurnLog('burn persistence: inactive');
+      return { status: 200, body: { records: [], persistence: 'inactive' } };
+    }
     serverBurnLog(`verification failed: ${message}`);
-    return { status: 400, body: { error: message } };
+    return {
+      status: 400,
+      body: { verified: false, persistence: input.persistence, error: message },
+    };
   }
 }

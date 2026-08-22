@@ -141,6 +141,7 @@ export function BurnPanel({ mint, balance, onRefreshAfterRealBurn }: BurnPanelPr
         verified: true,
         slot: sent.record.slot,
         timestamp: sent.record.timestamp,
+        persistence: sent.persistence,
       };
       setResult(next);
       setConfirming(null);
@@ -263,6 +264,9 @@ export function BurnPanel({ mint, balance, onRefreshAfterRealBurn }: BurnPanelPr
           <>
             <p className="mode-pill mode-pill--safe">{COPY.verifiedBurn}</p>
             <p>{result.prepared.amountUi} MHOOD has been permanently burned.</p>
+            {result.persistence === 'inactive' ? (
+              <p className="muted">{COPY.burnVerifiedPersistenceInactive}</p>
+            ) : null}
             <p className="muted">Signature: {shortenAddress(result.signature, 6)}</p>
             {result.timestamp ? (
               <p className="muted">Time: {new Date(result.timestamp * 1000).toLocaleString()}</p>

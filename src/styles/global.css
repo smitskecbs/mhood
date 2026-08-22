@@ -684,6 +684,10 @@ a.wallet-picker__button {
   margin-bottom: 0;
 }
 
+.stats-grid--grove {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
 .stat-value {
   margin: 4px 0 0;
   font-size: 1.05rem;

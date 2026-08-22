@@ -11,7 +11,6 @@ export type BurnLogStage =
   | 'persist';
 
 export function burnLog(message: string, extra?: unknown): void {
-  if (!import.meta.env.DEV) return;
   if (extra !== undefined) {
     console.info(`[MoginHood] ${message}`, extra);
     return;

@@ -1,6 +1,17 @@
 import type { BurnPersistenceMode, BurnRecord } from '../types';
+import { burnLog } from '../utils/burnLog';
 
 export const VERIFIED_BURNS_PATH = '/api/verified-burns';
+
+export type VerifiedBurnSubmitResult = {
+  verified: boolean;
+  record?: BurnRecord;
+  persistence: BurnPersistenceMode;
+};
+
+function persistenceMode(value: unknown, fallback: BurnPersistenceMode): BurnPersistenceMode {
+  return value === 'inactive' ? 'inactive' : fallback;
+}
 
 export async function fetchVerifiedBurnLedger(): Promise<{
   records: BurnRecord[];
@@ -8,7 +19,7 @@ export async function fetchVerifiedBurnLedger(): Promise<{
 }> {
   try {
     const response = await fetch(VERIFIED_BURNS_PATH);
-    if (!response.ok) return { records: [], persistence: 'local' };
+    if (!response.ok) return { records: [], persistence: 'inactive' };
     const payload = (await response.json()) as {
       records?: BurnRecord[];
       persistence?: BurnPersistenceMode;
@@ -17,11 +28,11 @@ export async function fetchVerifiedBurnLedger(): Promise<{
       ? payload.records.filter((record) => !record.simulated)
       : [];
     return {
-      records,
-      persistence: payload.persistence === 'inactive' ? 'inactive' : 'local',
+      records: payload.persistence === 'inactive' ? [] : records,
+      persistence: persistenceMode(payload.persistence, 'local'),
     };
   } catch {
-    return { records: [], persistence: 'local' };
+    return { records: [], persistence: 'inactive' };
   }
 }
 
@@ -30,18 +41,33 @@ export async function fetchVerifiedBurnRecords(): Promise<BurnRecord[]> {
   return ledger.records;
 }
 
-export async function submitVerifiedBurnSignature(signature: string): Promise<BurnRecord> {
-  const response = await fetch(VERIFIED_BURNS_PATH, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ signature }),
-  });
-  const payload = (await response.json().catch(() => ({}))) as {
-    record?: BurnRecord;
-    error?: string;
-  };
-  if (!response.ok || !payload.record) {
-    throw new Error(payload.error || 'The forest could not confirm the burn.');
+export async function submitVerifiedBurnSignature(signature: string): Promise<VerifiedBurnSubmitResult> {
+  try {
+    const response = await fetch(VERIFIED_BURNS_PATH, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ signature }),
+    });
+    const payload = (await response.json().catch(() => ({}))) as {
+      verified?: boolean;
+      record?: BurnRecord;
+      persistence?: BurnPersistenceMode;
+      error?: string;
+    };
+    const persistence = persistenceMode(
+      payload.persistence,
+      response.ok ? 'local' : 'inactive',
+    );
+    if (persistence === 'inactive') {
+      burnLog('burn persistence: inactive');
+    }
+    return {
+      verified: payload.verified === true || Boolean(payload.record),
+      record: payload.record,
+      persistence,
+    };
+  } catch {
+    burnLog('burn persistence: inactive');
+    return { verified: false, persistence: 'inactive' };
   }
-  return payload.record;
 }

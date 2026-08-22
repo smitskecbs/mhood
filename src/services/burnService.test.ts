@@ -19,8 +19,10 @@ import {
   assertBurnSafety,
   buildBurnInstructions,
   buildBurnTransaction,
+  confirmBurnSignature,
   executePreparedBurn,
   formatBurnUserError,
+  pollSignatureConfirmed,
   prepareBurn,
   RealBurnDisabledError,
   shouldRefreshAfterVerifiedBurn,
@@ -82,7 +84,12 @@ function parsedBurnTx(amount: string) {
 function mockConnection(overrides: Partial<Connection> = {}): Connection {
   return {
     getLatestBlockhash: async () => ({ blockhash: 'blockhash-1', lastValidBlockHeight: 123 }),
-    confirmTransaction: async () => ({ value: { err: null } }),
+    confirmTransaction: async () => {
+      throw new Error('WebSocket confirmation is not allowed');
+    },
+    onSignature: () => {
+      throw new Error('WebSocket subscriptions are not allowed');
+    },
     getSignatureStatuses: async () => ({ value: [{ confirmationStatus: 'confirmed', err: null }] }),
     getParsedTransaction: async () => parsedBurnTx('250000000000'),
     ...overrides,
@@ -230,7 +237,7 @@ describe('burnService safety', () => {
     expect(shouldRefreshAfterVerifiedBurn({ mode: 'real' })).toBe(false);
   });
 
-  it('maps wallet rejection, confirmation, verification and persistence failures', async () => {
+  it('maps wallet rejection and confirmation failures without treating persistence as burn failure', async () => {
     flags.real = true;
     expect(formatBurnUserError({ name: 'WalletSendTransactionError', message: 'User rejected the request' })).toBe(
       'The offering was withdrawn.',
@@ -273,22 +280,25 @@ describe('burnService safety', () => {
       submitAndVerifyBurn({
         prepared,
         connection: mockConnection({
-          confirmTransaction: async () => ({ value: { err: { InstructionError: [0, 'Custom'] } } }) as never,
+          getSignatureStatuses: async () => ({
+            value: [{ confirmationStatus: 'confirmed', err: { InstructionError: [0, 'Custom'] } }],
+          }) as never,
         }),
         wallet: { sendTransaction: async () => 'sig' },
       }),
     ).rejects.toMatchObject({ category: 'transaction-failed' });
 
-    await expect(
-      submitAndVerifyBurn({
-        prepared,
-        connection: mockConnection(),
-        wallet: { sendTransaction: async () => 'sig-real' },
-        persist: async () => {
-          throw new Error('store failed');
-        },
-      }),
-    ).rejects.toMatchObject({ category: 'persistence-failed' });
+    const persisted = await submitAndVerifyBurn({
+      prepared,
+      connection: mockConnection(),
+      wallet: { sendTransaction: async () => 'sig-real' },
+      persist: async () => {
+        throw new Error('store failed');
+      },
+    });
+    expect(persisted.signature).toBe('sig-real');
+    expect(persisted.persistence).toBe('inactive');
+    expect(persisted.record.amountRaw).toBe('250000000000');
   });
 
   it('requires a wallet that can send or sign transactions', () => {
@@ -374,5 +384,105 @@ describe('burnService safety', () => {
       }),
     ).rejects.toMatchObject({ category: 'wallet-rejected' });
     expect(persist).not.toHaveBeenCalled();
+  });
+});
+
+describe('HTTP-only burn confirmation', () => {
+  const sleep = async () => undefined;
+
+  it('polls getSignatureStatuses and does not require WebSocket confirmation', async () => {
+    const confirmTransaction = vi.fn(async () => {
+      throw new Error('WebSocket confirmation is not allowed');
+    });
+    const onSignature = vi.fn();
+    const getSignatureStatuses = vi.fn(async () => ({
+      value: [{ confirmationStatus: 'confirmed', err: null }],
+    }));
+    await confirmBurnSignature(
+      mockConnection({ confirmTransaction, onSignature, getSignatureStatuses } as never),
+      'sig-http',
+      { blockhash: 'blockhash-1', lastValidBlockHeight: 1 },
+      { sleep, intervalMs: 1, timeoutMs: 4 },
+    );
+    expect(getSignatureStatuses).toHaveBeenCalledWith(['sig-http'], { searchTransactionHistory: true });
+    expect(confirmTransaction).not.toHaveBeenCalled();
+    expect(onSignature).not.toHaveBeenCalled();
+  });
+
+  it('keeps polling while the signature is only processed', async () => {
+    const getSignatureStatuses = vi
+      .fn()
+      .mockResolvedValueOnce({ value: [{ confirmationStatus: 'processed', err: null }] })
+      .mockResolvedValueOnce({ value: [{ confirmationStatus: 'confirmed', err: null }] });
+    await pollSignatureConfirmed(mockConnection({ getSignatureStatuses }), 'sig-processed', {
+      sleep,
+      intervalMs: 1,
+      timeoutMs: 4,
+    });
+    expect(getSignatureStatuses).toHaveBeenCalledTimes(2);
+  });
+
+  it('treats confirmed and finalized as success', async () => {
+    await pollSignatureConfirmed(
+      mockConnection({
+        getSignatureStatuses: async () => ({ value: [{ confirmationStatus: 'finalized', err: null }] }),
+      } as never),
+      'sig-final',
+      { sleep, intervalMs: 1, timeoutMs: 2 },
+    );
+    await pollSignatureConfirmed(
+      mockConnection({
+        getSignatureStatuses: async () => ({ value: [{ confirmationStatus: 'confirmed', err: null }] }),
+      } as never),
+      'sig-confirmed',
+      { sleep, intervalMs: 1, timeoutMs: 2 },
+    );
+  });
+
+  it('fails when the transaction has an on-chain error', async () => {
+    await expect(
+      pollSignatureConfirmed(
+        mockConnection({
+          getSignatureStatuses: async () => ({
+            value: [{ confirmationStatus: 'confirmed', err: { InstructionError: [0, 'Custom'] } }],
+          }),
+        } as never),
+        'sig-err',
+        { sleep, intervalMs: 1, timeoutMs: 2 },
+      ),
+    ).rejects.toMatchObject({ category: 'transaction-failed' });
+  });
+
+  it('times out with a clear confirmation error', async () => {
+    await expect(
+      pollSignatureConfirmed(
+        mockConnection({
+          getSignatureStatuses: async () => ({ value: [{ confirmationStatus: 'processed', err: null }] }),
+        } as never),
+        'sig-timeout',
+        { sleep, intervalMs: 1, timeoutMs: 2 },
+      ),
+    ).rejects.toMatchObject({
+      category: 'rpc-unavailable',
+      message: 'The burn was sent but confirmation timed out.',
+    });
+  });
+
+  it('treats a verified burn as success when persistence is inactive', async () => {
+    flags.real = true;
+    const prepared = prepareBurn({
+      wallet,
+      mint,
+      accounts: balance.accounts,
+      amountRaw: 250_000_000_000n,
+    });
+    const sent = await submitAndVerifyBurn({
+      prepared,
+      connection: mockConnection(),
+      wallet: { sendTransaction: async () => 'sig-real' },
+      persist: async () => ({ verified: true, persistence: 'inactive' }),
+    });
+    expect(sent.persistence).toBe('inactive');
+    expect(sent.record.signature).toBe('sig-real');
   });
 });

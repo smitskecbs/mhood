@@ -138,4 +138,5 @@ export type BurnExecutionResult =
       verified: true;
       slot: number;
       timestamp: number | null;
+      persistence?: BurnPersistenceMode;
     };

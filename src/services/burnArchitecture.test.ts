@@ -13,4 +13,13 @@ describe('real burn architecture', () => {
     expect(vercelBurns).not.toMatch(/writeFileSync/);
     expect(vercelBurns).not.toMatch(/fromSecretKey/);
   });
+
+  it('confirms production burns with HTTP polling and no WebSocket subscriptions', () => {
+    const burnService = readFileSync(path.resolve(process.cwd(), 'src/services/burnService.ts'), 'utf8');
+    expect(burnService).toMatch(/getSignatureStatuses/);
+    expect(burnService).toMatch(/confirming burn via HTTP polling/);
+    expect(burnService).not.toMatch(/connection\.confirmTransaction/);
+    expect(burnService).not.toMatch(/onSignature\(/);
+    expect(burnService).not.toMatch(/onAccountChange\(/);
+  });
 });

@@ -4,6 +4,10 @@ export const ACCESS_GRANTED_MS = 2200;
 export const FOREST_FADE_MS = 2200;
 export const BALANCE_REFRESH_MS = 45_000;
 
+export const MHOOD_DECIMALS = 6;
+export const MHOOD_ORIGINAL_SUPPLY_UI = 1_000_000_000n;
+export const MHOOD_ORIGINAL_SUPPLY_RAW = MHOOD_ORIGINAL_SUPPLY_UI * 10n ** BigInt(MHOOD_DECIMALS);
+
 export const BACKGROUNDS = {
   gateI: '/backgrounds/background1.jpg',
   gateII: '/backgrounds/background2.jpg',
@@ -39,7 +43,10 @@ export const COPY = {
   burnSuccessTitle: 'RETURNED TO THE FOREST',
   offeringWithdrawn: 'The offering was withdrawn.',
   burnUnconfirmed: 'The forest could not confirm the burn.',
+  burnConfirmTimeout: 'The burn was sent but confirmation timed out.',
   burnCouldNotComplete: 'The burn could not be completed.',
+  burnVerifiedPersistenceInactive:
+    'Burn verified on-chain. Leaderboard storage is not yet persistent.',
   distributionTitle: 'TOKEN DISTRIBUTION',
   holdersTitle: 'FOREST HOLDERS',
   legendsTitle: 'FOREST LEGENDS',

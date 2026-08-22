@@ -56,12 +56,11 @@ describe('burnRankingService', () => {
     expect(findWalletBurnedRaw(snapshot, 'WALLET_A')).toBe(1500n);
   });
 
-  it('labels empty burn records as unavailable instead of mock data', () => {
+  it('does not invent per-wallet leaderboard records from global supply', () => {
     const snapshot = aggregateBurnRecords([], 6);
-    expect(snapshot.live).toBe(false);
-    expect(snapshot.source).toBe('none');
     expect(snapshot.entries).toEqual([]);
-    expect(snapshot.totalBurns).toBe(0);
+    expect(snapshot.records).toEqual([]);
+    expect(snapshot.source).toBe('none');
   });
 
   it('ignores simulated records and labels known project wallets', () => {

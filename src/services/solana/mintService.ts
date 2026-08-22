@@ -8,6 +8,8 @@ import {
   HOLDER_MINT_RPC_METHOD,
   HolderVerificationError,
 } from '../../utils/holderVerificationError';
+import { formatTokenAmount } from '../../utils/tokenAmount';
+import { totalBurnedFromSupply } from '../../utils/mhoodSupply';
 import { postJsonRpc, unwrapRpcContextValue, type JsonRpcContextResult } from './jsonRpc';
 
 export const CLASSIC_SPL_MINT_SIZE = 82;
@@ -256,6 +258,8 @@ async function loadMintDetails(mintAddress: string): Promise<MintDetails> {
       byteLength: bytes.byteLength,
       decimals,
     });
+    console.info(`[MoginHood] current supply: ${formatTokenAmount(supplyRaw, decimals)}`);
+    console.info(`[MoginHood] total burned: ${formatTokenAmount(totalBurnedFromSupply(supplyRaw), decimals)}`);
   } catch {
     /* diagnostics must not fail mint-read */
   }

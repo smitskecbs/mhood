@@ -10,6 +10,7 @@ import { useBurnRanking } from '../hooks/useBurnRanking';
 import { useForestAccess } from '../hooks/useForestAccess';
 import { useHolderRanking } from '../hooks/useHolderRanking';
 import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
+import { clearMintCache } from '../services/solana/mintService';
 import { sceneVisualState } from '../utils/sceneVisibility';
 import { logWalletUiReady, markGateIIStart } from '../utils/gateTiming';
 import type { ForestScene } from '../types';
@@ -83,6 +84,7 @@ export function ForestApp() {
   const showForestUi = visuals.showForestUi && status === 'granted' && mint && balance;
 
   async function refreshAll() {
+    clearMintCache();
     await refresh();
     await Promise.all([holders.refresh({ bypassCache: true }), burns.refresh()]);
   }

@@ -7,6 +7,7 @@ import {
 } from '@solana/web3.js';
 import type {
   BurnErrorCategory,
+  BurnPersistenceMode,
   BurnRecord,
   MintDetails,
   PreparedBurn,
@@ -150,48 +151,67 @@ async function sendBurnTransaction(
   return signature;
 }
 
+export type SignatureStatusPollOptions = {
+  timeoutMs?: number;
+  intervalMs?: number;
+  sleep?: (ms: number) => Promise<void>;
+};
+
+function defaultSleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Production RPC is an HTTP-only Vercel Function. `@solana/web3.js` would
+ * derive `wss://…/api/rpc` and hang on websocket confirmation subscriptions.
+ * Burn confirmation must poll `getSignatureStatuses` over HTTP only.
+ */
 export async function confirmBurnSignature(
   connection: Connection,
   signature: string,
-  latest: { blockhash: string; lastValidBlockHeight: number },
+  _latest?: { blockhash: string; lastValidBlockHeight: number },
+  options?: SignatureStatusPollOptions,
 ): Promise<void> {
-  try {
-    const confirmation = await connection.confirmTransaction(
-      {
-        signature,
-        blockhash: latest.blockhash,
-        lastValidBlockHeight: latest.lastValidBlockHeight,
-      },
-      'confirmed',
-    );
-    if (confirmation.value.err) {
-      throw new BurnFlowError('confirm', 'transaction-failed', 'The burn transaction failed on-chain.');
-    }
-    return;
-  } catch (err) {
-    if (err instanceof BurnFlowError) throw err;
-    await pollSignatureConfirmed(connection, signature);
-  }
+  await pollSignatureConfirmed(connection, signature, options);
 }
 
 export async function pollSignatureConfirmed(
   connection: Connection,
   signature: string,
-  timeoutMs = 60_000,
+  options: SignatureStatusPollOptions = {},
 ): Promise<void> {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    const statuses = await connection.getSignatureStatuses([signature]);
+  const timeoutMs = options.timeoutMs ?? 60_000;
+  const intervalMs = options.intervalMs ?? 1_500;
+  const sleep = options.sleep ?? defaultSleep;
+  const maxAttempts = Math.max(1, Math.ceil(timeoutMs / intervalMs));
+
+  burnLog('confirming burn via HTTP polling');
+  let lastLogged = '';
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const statuses = await connection.getSignatureStatuses([signature], {
+      searchTransactionHistory: true,
+    });
     const value = statuses.value[0];
     if (value?.err) {
       throw new BurnFlowError('confirm', 'transaction-failed', 'The burn transaction failed on-chain.');
     }
-    if (value?.confirmationStatus === 'confirmed' || value?.confirmationStatus === 'finalized') {
+
+    const status = value?.confirmationStatus;
+    if (status && status !== lastLogged) {
+      burnLog(`signature status: ${status}`);
+      lastLogged = status;
+    }
+
+    if (status === 'confirmed' || status === 'finalized') {
+      burnLog('burn status: confirmed');
       return;
     }
-    await new Promise((resolve) => setTimeout(resolve, 1200));
+
+    await sleep(intervalMs);
   }
-  throw new BurnFlowError('confirm', 'rpc-unavailable', COPY.burnUnconfirmed);
+
+  throw new BurnFlowError('confirm', 'rpc-unavailable', COPY.burnConfirmTimeout);
 }
 
 export async function executePreparedBurn(params: {
@@ -258,7 +278,12 @@ export async function submitAndVerifyBurn(params: {
   connection?: Connection;
   wallet: WalletTransactionSender;
   persist?: (signature: string) => Promise<unknown>;
-}): Promise<{ signature: string; prepared: PreparedBurn; record: BurnRecord }> {
+}): Promise<{
+  signature: string;
+  prepared: PreparedBurn;
+  record: BurnRecord;
+  persistence: BurnPersistenceMode;
+}> {
   if (!isRealBurnEnabled()) {
     throw new RealBurnDisabledError(params.prepared);
   }
@@ -297,7 +322,6 @@ export async function submitAndVerifyBurn(params: {
   }
 
   burnLog(`transaction signature: ${signature}`);
-  burnLog('confirming transaction');
   try {
     await confirmBurnSignature(connection, signature, {
       blockhash: built.transaction.recentBlockhash ?? built.blockhash,
@@ -308,7 +332,6 @@ export async function submitAndVerifyBurn(params: {
     if (err instanceof BurnFlowError) throw err;
     throw new BurnFlowError('confirm', 'rpc-unavailable', COPY.burnUnconfirmed);
   }
-  burnLog('transaction confirmed');
 
   burnLog('verifying BurnChecked on-chain');
   let record: BurnRecord;
@@ -331,16 +354,33 @@ export async function submitAndVerifyBurn(params: {
   }
   burnLog('burn verification: true');
 
-  if (params.persist) {
-    burnLog('saving verified burn');
-    try {
-      await params.persist(signature);
-    } catch (err) {
-      burnErrorLog('persist', err);
-      throw new BurnFlowError('persist', 'persistence-failed', COPY.burnCouldNotComplete);
-    }
-    burnLog('verified burn saved');
-  }
+  const persistence = await persistVerifiedBurn(params.persist, signature);
+  return { signature, prepared: params.prepared, record, persistence };
+}
 
-  return { signature, prepared: params.prepared, record };
+function persistenceFromResult(result: unknown): BurnPersistenceMode {
+  if (result && typeof result === 'object' && 'persistence' in result) {
+    return (result as { persistence?: unknown }).persistence === 'inactive' ? 'inactive' : 'local';
+  }
+  return 'local';
+}
+
+async function persistVerifiedBurn(
+  persist: ((signature: string) => Promise<unknown>) | undefined,
+  signature: string,
+): Promise<BurnPersistenceMode> {
+  if (!persist) return 'local';
+  try {
+    const result = await persist(signature);
+    const persistence = persistenceFromResult(result);
+    if (persistence === 'inactive') {
+      burnLog('burn persistence: inactive');
+    } else {
+      burnLog('verified burn saved');
+    }
+    return persistence;
+  } catch {
+    burnLog('burn persistence: inactive');
+    return 'inactive';
+  }
 }
