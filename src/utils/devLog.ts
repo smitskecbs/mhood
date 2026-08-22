@@ -1,5 +1,6 @@
-import { COPY } from '../config/constants';
-import { RPC_NOT_CONFIGURED } from '../config/env';
+import { formatHolderVerificationError, type HolderRpcErrorView } from './holderVerificationError';
+
+export type { HolderRpcErrorView };
 
 export function devLog(event: string, data?: Record<string, unknown>): void {
   if (!import.meta.env.DEV) return;
@@ -18,20 +19,8 @@ export function extractErrorMessage(err: unknown): string {
   return '';
 }
 
-export type HolderRpcErrorView = {
-  title: string;
-  detail?: string;
-};
-
 export function formatHolderRpcError(err: unknown): HolderRpcErrorView {
-  const message = extractErrorMessage(err);
-  if (/not configured/i.test(message)) {
-    return { title: RPC_NOT_CONFIGURED };
-  }
-  return {
-    title: COPY.rpcUnavailable,
-    detail: COPY.rpcUnavailableDetail,
-  };
+  return formatHolderVerificationError(err);
 }
 
 /** Technical detail for the development console only. */

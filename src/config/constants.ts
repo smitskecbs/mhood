@@ -23,6 +23,7 @@ export const COPY = {
   forestCloses: 'THE FOREST CLOSES.',
   rpcUnavailable: 'The forest cannot verify your MHOOD right now.',
   rpcUnavailableDetail: 'RPC connection unavailable.',
+  holderVerifyFailed: 'The forest could not verify this wallet.',
   ledgerReading: 'Reading the forest ledger...',
   ledgerError: 'The forest ledger cannot be read right now.',
   noBurns: 'No verified forest burns yet.',

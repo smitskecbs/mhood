@@ -4,11 +4,15 @@ import type { AccessStatus, MintDetails, WalletMhoodBalance } from '../types';
 import { BALANCE_REFRESH_MS } from '../config/constants';
 import { appConfig, isDevBypassGateEnabled, requireConfiguredRpcUrl } from '../config/env';
 import { fetchMintDetails } from '../services/solana/mintService';
-import { getConnection } from '../services/solana/connection';
 import { fetchWalletMhoodBalance, thresholdRawFromMint } from '../services/mhoodBalanceService';
 import { accessAfterWalletChange, evaluateHolderGate, resolveAccessStatus } from '../utils/access';
 import { formatTokenAmount } from '../utils/tokenAmount';
-import { devLog, formatHolderRpcError, formatRpcError, redactRpcUrl } from '../utils/devLog';
+import { formatHolderRpcError, redactRpcUrl, devLog } from '../utils/devLog';
+import {
+  HolderVerificationError,
+  logHolderVerificationFailure,
+  type HolderVerificationStage,
+} from '../utils/holderVerificationError';
 import { shouldStartSingleHolderVerification, claimHolderVerification, resetHolderVerification } from '../utils/walletInteraction';
 import {
   buildForestAccessMessage,
@@ -61,48 +65,60 @@ export function useForestAccess() {
       setChecking(true);
       setError(null);
       setErrorDetail(null);
+      let stage: HolderVerificationStage = 'connection-init';
       if (import.meta.env.DEV) {
         console.info('[MoginHood] starting holder verification');
       }
 
       try {
         requireConfiguredRpcUrl();
-        const connection = getConnection();
-        const mintDetails = await fetchMintDetails(connection);
+        stage = 'mint-read';
+        const mintDetails = await fetchMintDetails();
         if (id !== requestId.current) return null;
         setMint(mintDetails);
 
-        let result = await fetchWalletMhoodBalance(walletAddress, { mintDetails, connection });
+        stage = options?.recheck ? 'recheck' : 'token-accounts';
+        let result = await fetchWalletMhoodBalance(walletAddress, { mintDetails });
         if (id !== requestId.current) return null;
 
         if (options?.recheck && result.meetsAccessThreshold) {
-          result = await fetchWalletMhoodBalance(walletAddress, { mintDetails, connection });
+          stage = 'recheck';
+          result = await fetchWalletMhoodBalance(walletAddress, { mintDetails });
           if (id !== requestId.current) return null;
         }
 
+        stage = 'threshold-compare';
         setBalance(result);
         const thresholdRaw = thresholdRawFromMint(mintDetails);
         const gate = evaluateHolderGate(result.totalRaw, thresholdRaw);
-        devLog(options?.recheck ? 'gate recheck' : 'holder verification', {
-          publicKey: walletAddress,
-          rpc: redactRpcUrl(appConfig.rpcUrl || '(unconfigured)'),
-          tokenAccounts: result.accounts.length,
-          rawBalance: result.totalRaw.toString(),
-          uiBalance: formatTokenAmount(result.totalRaw, mintDetails.decimals),
-          gate,
-        });
+        try {
+          console.info(options?.recheck ? '[MoginHood] gate recheck' : '[MoginHood] holder verification', {
+            publicKey: walletAddress,
+            rpc: redactRpcUrl(appConfig.rpcUrl || '(unconfigured)'),
+            tokenAccounts: result.accounts.length,
+            rawBalance: result.totalRaw.toString(),
+            uiBalance: formatTokenAmount(result.totalRaw, mintDetails.decimals),
+            gate,
+          });
+        } catch {
+          /* logging must not fail a successful holder check */
+        }
         return result;
       } catch (err) {
         if (id !== requestId.current) return null;
-        const view = formatHolderRpcError(err);
+        const wrapped = HolderVerificationError.from(err, stage);
+        logHolderVerificationFailure({
+          err: wrapped,
+          stage: wrapped.stage,
+          rpc: redactRpcUrl(appConfig.rpcUrl || '(unconfigured)'),
+          wallet: walletAddress,
+          mint: appConfig.mintAddress,
+          method: wrapped.method,
+        });
+        const view = formatHolderRpcError(wrapped);
         setError(view.title);
         setErrorDetail(view.detail ?? null);
         setBalance(null);
-        devLog('RPC error', {
-          publicKey: walletAddress,
-          rpc: redactRpcUrl(appConfig.rpcUrl || '(unconfigured)'),
-          error: formatRpcError(err),
-        });
         return null;
       } finally {
         if (id === requestId.current) {

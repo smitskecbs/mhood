@@ -55,6 +55,7 @@ vi.mock('../config/env', async () => {
 });
 
 import { useForestAccess } from './useForestAccess';
+import { COPY } from '../config/constants';
 
 const mint: MintDetails = {
   mint: 'EiuaNV7T3Uz7yoVxkgxZQGXENreyBUqDWnfBLjbsYVVs',
@@ -241,6 +242,31 @@ describe('useForestAccess signature gate', () => {
       await result.current.authenticate();
     });
     await waitFor(() => expect(result.current.status).toBe('insufficient'));
+  });
+
+  it('maps a network failure to RPC unavailable', async () => {
+    const keypair = connectWallet();
+    mocks.fetchBalance.mockRejectedValue(Object.assign(new TypeError('Failed to fetch'), { name: 'TypeError' }));
+    const { result } = renderHook(() => useForestAccess());
+    await act(async () => {
+      await result.current.authenticate();
+    });
+    await waitFor(() => expect(result.current.status).toBe('error'));
+    expect(result.current.error).toBe(COPY.rpcUnavailable);
+    expect(result.current.errorDetail).toBe(COPY.rpcUnavailableDetail);
+    expect(keypair.publicKey.toBase58()).toBeTruthy();
+  });
+
+  it('does not map a parse failure to RPC unavailable', async () => {
+    connectWallet();
+    mocks.fetchBalance.mockRejectedValue(new Error('Could not parse token account amount'));
+    const { result } = renderHook(() => useForestAccess());
+    await act(async () => {
+      await result.current.authenticate();
+    });
+    await waitFor(() => expect(result.current.status).toBe('error'));
+    expect(result.current.error).toBe(COPY.holderVerifyFailed);
+    expect(result.current.errorDetail).not.toBe(COPY.rpcUnavailableDetail);
   });
 });
 

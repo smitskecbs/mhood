@@ -1,11 +1,15 @@
-import { PublicKey, type Connection } from '@solana/web3.js';
+import type { Connection } from '@solana/web3.js';
 import type { MintDetails, TokenAccountBalance, WalletMhoodBalance } from '../types';
 import { appConfig, isDevBypassGateEnabled, requireConfiguredRpcUrl } from '../config/env';
 import { uiAmountToRaw } from '../utils/tokenAmount';
 import { evaluateHolderGate } from '../utils/access';
 import { sumTokenAccounts } from '../utils/accounts';
-import { getConnection } from './solana/connection';
+import {
+  HOLDER_TOKEN_ACCOUNTS_RPC_METHOD,
+  HolderVerificationError,
+} from '../utils/holderVerificationError';
 import { fetchMintDetails } from './solana/mintService';
+import { postJsonRpc, unwrapRpcContextValue, type JsonRpcContextResult } from './solana/jsonRpc';
 
 export function thresholdRawFromMint(mint: MintDetails, thresholdUi = appConfig.accessThresholdUi): bigint {
   return uiAmountToRaw(thresholdUi, mint.decimals);
@@ -36,7 +40,12 @@ export type ParsedTokenAccountResponse = {
           mint?: string;
           owner?: string;
           state?: string;
-          tokenAmount?: { amount?: string | number };
+          tokenAmount?: {
+            amount?: string | number;
+            decimals?: number;
+            uiAmount?: number | null;
+            uiAmountString?: string;
+          };
         };
       };
     };
@@ -94,8 +103,8 @@ export function buildWalletMhoodBalance(params: {
 
 /**
  * Sums every token account for this wallet + MHOOD mint.
- * Uses a mint filter (classic SPL getTokenAccountsByOwner).
- * Amounts are read as integer strings and converted to bigint — never uiAmount floats.
+ * Uses getTokenAccountsByOwner with jsonParsed encoding (same method
+ * web3.js getParsedTokenAccountsByOwner sends). Amounts are integer strings.
  */
 export async function fetchWalletMhoodBalance(
   wallet: string,
@@ -105,20 +114,42 @@ export async function fetchWalletMhoodBalance(
   },
 ): Promise<WalletMhoodBalance> {
   requireConfiguredRpcUrl();
-  const connection = options?.connection ?? getConnection();
-  const mintDetails = options?.mintDetails ?? (await fetchMintDetails(connection));
-  const owner = new PublicKey(wallet);
-  const mint = new PublicKey(mintDetails.mint);
-
-  const response = await connection.getParsedTokenAccountsByOwner(owner, { mint }, 'confirmed');
-  const accounts = collectTokenAccountsFromParsed(response.value, mintDetails.mint, wallet);
-
-  return buildWalletMhoodBalance({
-    wallet,
-    mint: mintDetails,
-    accounts,
-    bypassGate: isDevBypassGateEnabled(),
+  const mintDetails = options?.mintDetails ?? (await fetchMintDetails(options?.connection));
+  const result = await postJsonRpc<JsonRpcContextResult<ParsedTokenAccountResponse[]>>({
+    method: HOLDER_TOKEN_ACCOUNTS_RPC_METHOD,
+    params: [
+      wallet,
+      { mint: mintDetails.mint },
+      { encoding: 'jsonParsed', commitment: 'confirmed' },
+    ],
+    stage: 'token-accounts',
   });
+  const value = unwrapRpcContextValue<unknown>(result, 'token-accounts', HOLDER_TOKEN_ACCOUNTS_RPC_METHOD);
+  if (!Array.isArray(value)) {
+    throw new HolderVerificationError({
+      stage: 'token-accounts',
+      method: HOLDER_TOKEN_ACCOUNTS_RPC_METHOD,
+      message: 'Token accounts result.value is not an array',
+    });
+  }
+
+  let accounts: TokenAccountBalance[];
+  try {
+    accounts = collectTokenAccountsFromParsed(value, mintDetails.mint, wallet);
+  } catch (err) {
+    throw HolderVerificationError.from(err, 'balance-parse', HOLDER_TOKEN_ACCOUNTS_RPC_METHOD);
+  }
+
+  try {
+    return buildWalletMhoodBalance({
+      wallet,
+      mint: mintDetails,
+      accounts,
+      bypassGate: isDevBypassGateEnabled(),
+    });
+  } catch (err) {
+    throw HolderVerificationError.from(err, 'threshold-compare', HOLDER_TOKEN_ACCOUNTS_RPC_METHOD);
+  }
 }
 
 export async function verifyForestAccess(
