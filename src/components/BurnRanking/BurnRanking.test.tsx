@@ -23,4 +23,17 @@ describe('BurnRanking', () => {
     expect(screen.queryByText(/MOCK_FOREST_BURNER/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Development data/)).not.toBeInTheDocument();
   });
+
+  it('says production burn history is not stored yet when persistence is inactive', () => {
+    render(
+      <BurnRanking
+        snapshot={{ ...empty, persistence: 'inactive', disclaimer: COPY.legendsPersistenceInactive }}
+        loading={false}
+        error={null}
+        currentWallet={null}
+      />,
+    );
+    expect(screen.getByText(COPY.legendsPersistenceInactive)).toBeInTheDocument();
+    expect(screen.queryByText(COPY.noBurns)).not.toBeInTheDocument();
+  });
 });

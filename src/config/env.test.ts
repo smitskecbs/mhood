@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+  clientUsesRpcProxy,
   getConfiguredRpcUrl,
   isRealBurnEnabled,
   parseRealBurnFlag,
   parseSolanaRpcUrl,
-  RPC_NOT_CONFIGURED,
   requireConfiguredRpcUrl,
+  resolveClientRpcUrl,
+  RPC_PROXY_PATH,
 } from './env';
 import { getConnection, getConnectionEndpoint, UNCONFIGURED_RPC_PLACEHOLDER } from '../services/solana/connection';
 
@@ -16,23 +18,32 @@ describe('Solana RPC env', () => {
     expect(parseSolanaRpcUrl(undefined)).toBeNull();
     expect(parseSolanaRpcUrl('not-a-url')).toBeNull();
     expect(parseSolanaRpcUrl('ftp://rpc.example.com')).toBeNull();
+    expect(parseSolanaRpcUrl('/api/rpc')).toBe('/api/rpc');
     expect(parseSolanaRpcUrl('https://my-provider.example/solana?api-key=secret')).toBe(
       'https://my-provider.example/solana?api-key=secret',
     );
   });
 
-  it('uses a non-public placeholder when env RPC is empty', () => {
+  it('uses the same-origin proxy in production even if a Helius URL is present', () => {
+    expect(
+      resolveClientRpcUrl({
+        isProd: true,
+        envUrl: 'https://mainnet.helius-rpc.com/?api-key=super-secret',
+        origin: 'https://mhood.cbs-coin.com',
+      }),
+    ).toBe('https://mhood.cbs-coin.com/api/rpc');
+    expect(clientUsesRpcProxy('https://mhood.cbs-coin.com/api/rpc')).toBe(true);
+    expect(clientUsesRpcProxy(RPC_PROXY_PATH)).toBe(true);
+    expect(clientUsesRpcProxy('https://mainnet.helius-rpc.com/?api-key=super-secret')).toBe(false);
+  });
+
+  it('shares one configured RPC endpoint for mint, balance and burn reads', () => {
     expect(UNCONFIGURED_RPC_PLACEHOLDER).not.toContain('api.mainnet-beta.solana.com');
     const configured = getConfiguredRpcUrl();
-    if (!configured) {
-      expect(getConnectionEndpoint()).toBe(UNCONFIGURED_RPC_PLACEHOLDER);
-      expect(() => requireConfiguredRpcUrl()).toThrow(RPC_NOT_CONFIGURED);
-      expect(() => getConnection()).toThrow(RPC_NOT_CONFIGURED);
-    } else {
-      expect(getConnectionEndpoint()).toBe(configured);
-      expect(requireConfiguredRpcUrl()).toBe(configured);
-      expect(getConnection().rpcEndpoint).toBe(configured);
-    }
+    expect(configured).toBeTruthy();
+    expect(getConnectionEndpoint()).toBe(configured);
+    expect(requireConfiguredRpcUrl()).toBe(configured);
+    expect(getConnection().rpcEndpoint).toBe(configured);
   });
 
   it('parses the real-burn flag from strings without treating "true" as a boolean', () => {

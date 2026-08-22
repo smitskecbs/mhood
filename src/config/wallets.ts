@@ -5,6 +5,8 @@ import { SolflareWalletAdapter } from '@solana/wallet-adapter-solflare';
 
 export const SUPPORTED_WALLET_NAMES = ['Backpack', 'Phantom', 'Solflare'] as const;
 
+export type WalletClickAction = 'connect' | 'open-in-wallet' | 'install' | 'noop';
+
 export function isWalletReadyForPopup(readyState: WalletReadyState): boolean {
   return readyState === WalletReadyState.Installed || readyState === WalletReadyState.Loadable;
 }
@@ -12,9 +14,13 @@ export function isWalletReadyForPopup(readyState: WalletReadyState): boolean {
 export function resolveWalletClickAction(input: {
   readyState: WalletReadyState;
   alreadyConnected: boolean;
-}): 'connect' | 'install' | 'noop' {
+  mobile?: boolean;
+  inWalletBrowser?: boolean;
+}): WalletClickAction {
   if (input.alreadyConnected) return 'noop';
-  return isWalletReadyForPopup(input.readyState) ? 'connect' : 'install';
+  if (input.inWalletBrowser || isWalletReadyForPopup(input.readyState)) return 'connect';
+  if (input.mobile) return 'open-in-wallet';
+  return 'install';
 }
 
 /**
@@ -71,4 +77,12 @@ export function formatWalletConnectError(error: { name?: string; message?: strin
     return `${name || 'Wallet'} was not detected.`;
   }
   return error.message || `${name || 'Wallet'} failed to connect.`;
+}
+
+export function walletPickerLabel(input: {
+  name: string;
+  action: WalletClickAction;
+}): string {
+  if (input.action === 'open-in-wallet') return `Open in ${input.name}`;
+  return input.name;
 }

@@ -1,4 +1,5 @@
 import type {
+  BurnPersistenceMode,
   BurnRankingEntry,
   BurnRankingSnapshot,
   BurnRecord,
@@ -7,7 +8,8 @@ import type {
 import { compareRawDesc, formatTokenAmount } from '../utils/tokenAmount';
 import { projectWalletLabel } from '../utils/holderPresentation';
 import { appConfig } from '../config/env';
-import { fetchVerifiedBurnRecords } from './verifiedBurnClient';
+import { COPY } from '../config/constants';
+import { fetchVerifiedBurnLedger } from './verifiedBurnClient';
 
 export interface BurnRankingProvider {
   readonly kind: RankingSourceKind;
@@ -28,12 +30,18 @@ export class EmptyBurnRankingProvider implements BurnRankingProvider {
 
 export class LocalVerifiedBurnsProvider implements BurnRankingProvider {
   readonly kind = 'local' as const;
-  readonly live = true;
-  readonly disclaimer = 'Verified on-chain MHOOD burns stored by the local Forest ledger.';
+  live = true;
+  disclaimer = 'Verified on-chain MHOOD burns stored by the local Forest ledger.';
+  persistence: BurnPersistenceMode = 'local';
 
   async fetchRecords(decimals: number): Promise<BurnRecord[]> {
-    const records = await fetchVerifiedBurnRecords();
-    return records.map((record) => ({
+    const ledger = await fetchVerifiedBurnLedger();
+    this.persistence = ledger.persistence;
+    if (ledger.persistence === 'inactive') {
+      this.live = false;
+      this.disclaimer = COPY.legendsPersistenceInactive;
+    }
+    return ledger.records.map((record) => ({
       ...record,
       amountUi: formatTokenAmount(BigInt(record.amountRaw), decimals),
       simulated: false,
@@ -127,7 +135,17 @@ export class BurnRankingService {
 
   async getRanking(decimals: number): Promise<BurnRankingSnapshot> {
     const records = await this.provider.fetchRecords(decimals);
-    return aggregateBurnRecords(records, decimals);
+    const snapshot = aggregateBurnRecords(records, decimals);
+    if (this.provider instanceof LocalVerifiedBurnsProvider && this.provider.persistence === 'inactive') {
+      return {
+        ...snapshot,
+        persistence: 'inactive',
+        live: false,
+        source: 'none',
+        disclaimer: COPY.legendsPersistenceInactive,
+      };
+    }
+    return snapshot;
   }
 }
 

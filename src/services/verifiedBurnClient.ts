@@ -1,16 +1,33 @@
-import type { BurnRecord } from '../types';
+import type { BurnPersistenceMode, BurnRecord } from '../types';
 
 export const VERIFIED_BURNS_PATH = '/api/verified-burns';
 
-export async function fetchVerifiedBurnRecords(): Promise<BurnRecord[]> {
+export async function fetchVerifiedBurnLedger(): Promise<{
+  records: BurnRecord[];
+  persistence: BurnPersistenceMode;
+}> {
   try {
     const response = await fetch(VERIFIED_BURNS_PATH);
-    if (!response.ok) return [];
-    const payload = (await response.json()) as { records?: BurnRecord[] };
-    return Array.isArray(payload.records) ? payload.records.filter((record) => !record.simulated) : [];
+    if (!response.ok) return { records: [], persistence: 'local' };
+    const payload = (await response.json()) as {
+      records?: BurnRecord[];
+      persistence?: BurnPersistenceMode;
+    };
+    const records = Array.isArray(payload.records)
+      ? payload.records.filter((record) => !record.simulated)
+      : [];
+    return {
+      records,
+      persistence: payload.persistence === 'inactive' ? 'inactive' : 'local',
+    };
   } catch {
-    return [];
+    return { records: [], persistence: 'local' };
   }
+}
+
+export async function fetchVerifiedBurnRecords(): Promise<BurnRecord[]> {
+  const ledger = await fetchVerifiedBurnLedger();
+  return ledger.records;
 }
 
 export async function submitVerifiedBurnSignature(signature: string): Promise<BurnRecord> {

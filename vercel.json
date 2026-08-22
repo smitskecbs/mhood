@@ -1,0 +1,13 @@
+{
+  "rewrites": [
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ],
+  "functions": {
+    "api/rpc.ts": {
+      "maxDuration": 30
+    },
+    "api/verified-burns.ts": {
+      "maxDuration": 30
+    }
+  }
+}

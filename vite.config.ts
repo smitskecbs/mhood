@@ -1,12 +1,13 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import { verifiedBurnsPlugin } from './server/viteVerifiedBurnsPlugin';
+import { moginhoodApiPlugin } from './server/viteVerifiedBurnsPlugin';
 
-export default defineConfig({
-  plugins: [react(), verifiedBurnsPlugin()],
+export default defineConfig(({ mode }) => ({
+  plugins: [react(), moginhoodApiPlugin()],
   define: {
     'process.env': {},
     global: 'globalThis',
+    ...(mode === 'production' ? { 'import.meta.env.VITE_SOLANA_RPC_URL': JSON.stringify('') } : {}),
   },
   resolve: {
     alias: {
@@ -21,4 +22,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));

@@ -26,6 +26,8 @@ export const COPY = {
   ledgerReading: 'Reading the forest ledger...',
   ledgerError: 'The forest ledger cannot be read right now.',
   noBurns: 'No verified forest burns yet.',
+  legendsPersistenceInactive:
+    'Persistent production burn history is not active yet. On-chain burns can still complete; Forest Legends will list them once a ledger is configured.',
   yourPosition: 'Your position',
   burnTitle: 'THE BURNING GROVE',
   burnPrompt: 'Choose what you are willing to return to the forest.',

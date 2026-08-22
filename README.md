@@ -2,7 +2,7 @@
 
 Lokale community-app voor de MoginHood-holderpoort. Dit is een eigen initiatief, gebouwd rond de MoginHood-sfeer: donker bos, verborgen toegang, rustig en cinematic. Geen CBS-branding, geen ManGo-branding.
 
-Deze eerste versie is **alleen lokaal**. Er is nog niets gedeployed en er hoeft nog niets naar GitHub.
+Deze versie draait lokaal én op Vercel (`https://mhood.cbs-coin.com`). De browser praat in productie met `/api/rpc`; de Helius-key blijft server-side.
 
 ## Wat het is
 
@@ -44,17 +44,18 @@ npm run build
 Kopieer `.env.example` naar `.env` (staat al klaar voor lokale development).
 
 ```env
-VITE_SOLANA_RPC_URL=
+VITE_SOLANA_RPC_URL=/api/rpc
+HELIUS_RPC_URL=
 VITE_MHOOD_MINT=EiuaNV7T3Uz7yoVxkgxZQGXENreyBUqDWnfBLjbsYVVs
 VITE_MHOOD_ACCESS_THRESHOLD=1000000
 VITE_ENABLE_REAL_BURN=false
-VITE_DEV_BYPASS_GATE=false
-VITE_SHOW_GATE_DEBUG=false
 ```
 
 - `.env` staat in `.gitignore`. Zet hier geen geheime API keys in git.
-- Vul `VITE_SOLANA_RPC_URL` met **jouw eigen Solana mainnet RPC** (Helius, QuickNode, Alchemy, …). De publieke `api.mainnet-beta.solana.com` geeft in de browser HTTP 403. De app valt daar niet meer stil op terug.
-- Herstart `npm run dev` na het zetten van de RPC-URL.
+- **Productie (Vercel):** zet server-only `HELIUS_RPC_URL` (Helius mainnet URL + API key). Verwijder `VITE_SOLANA_RPC_URL` als die de Helius-key bevat. De browser praat alleen met `/api/rpc`.
+- **Lokaal:** `HELIUS_RPC_URL` voedt de Vite `/api/rpc` proxy. Je mag `VITE_SOLANA_RPC_URL` nog op een directe RPC zetten voor local convenience; productie-builds negeren die waarde.
+- Forest Legends op Vercel slaat burns **niet** persistent op (geen filesystem-database). On-chain verify via POST kan wel; persistente ranking vraagt later KV/DB.
+- Herstart `npm run dev` na het zetten van RPC-env.
 
 ## MHOOD mint en threshold
 
@@ -189,17 +190,9 @@ Bekende project wallets staan in `src/config/projectWallets.ts` en verdwijnen ui
 
 ## Client-side RPC keys
 
-`VITE_SOLANA_RPC_URL` is voor **lokale development** acceptabel.
+Productie gebruikt **geen** Helius URL in de Vite-bundel. De browser praat met same-origin `/api/rpc`; Vercel leest `HELIUS_RPC_URL` alleen server-side.
 
-`VITE_`-variabelen worden in de browserbundel opgenomen. Een private Helius API key in die URL is **geen** geheime server-key. Iedereen met de gebundelde site kan die key uitlezen.
-
-Voor productie later:
-
-- backend of serverless proxy voor RPC / holder ranking
-- ranking server-side ophalen en cachen
-- provider credentials alleen server-side houden
-
-Bouw die backend nog niet in deze lokale versie.
+`VITE_SOLANA_RPC_URL` mag lokaal nog een directe RPC zijn. Production builds legen die waarde zodat een per ongeluk gezette Vercel `VITE_` key niet in HTML/JS belandt.
 
 ## Burn safety
 

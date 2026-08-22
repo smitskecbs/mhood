@@ -29,9 +29,6 @@ export function SolanaProviders({ children }: SolanaProvidersProps) {
     if (error.name === 'WalletNotReadyError') {
       devLog(`${walletName} connect error: ${message}`);
       setConnectError(message);
-      if (adapter?.url && typeof window !== 'undefined') {
-        window.open(adapter.url, '_blank', 'noreferrer');
-      }
       return;
     }
 

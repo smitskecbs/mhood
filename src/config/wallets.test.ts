@@ -7,6 +7,7 @@ import {
   preferReadyWallets,
   resolveWalletClickAction,
   uniqueAdaptersByName,
+  walletPickerLabel,
 } from './wallets';
 import { WalletReadyState } from '@solana/wallet-adapter-base';
 
@@ -58,6 +59,46 @@ describe('wallet click connect', () => {
     ).toBe('noop');
   });
 
+  it('keeps the desktop adapter flow on desktop even when the wallet is missing', () => {
+    expect(
+      resolveWalletClickAction({
+        readyState: WalletReadyState.NotDetected,
+        alreadyConnected: false,
+        mobile: false,
+        inWalletBrowser: false,
+      }),
+    ).toBe('install');
+    expect(
+      resolveWalletClickAction({
+        readyState: WalletReadyState.Installed,
+        alreadyConnected: false,
+        mobile: false,
+      }),
+    ).toBe('connect');
+  });
+
+  it('offers a browse deep link on mobile outside a wallet browser', () => {
+    expect(
+      resolveWalletClickAction({
+        readyState: WalletReadyState.NotDetected,
+        alreadyConnected: false,
+        mobile: true,
+        inWalletBrowser: false,
+      }),
+    ).toBe('open-in-wallet');
+  });
+
+  it('connects normally once the dapp is already inside a wallet browser', () => {
+    expect(
+      resolveWalletClickAction({
+        readyState: WalletReadyState.NotDetected,
+        alreadyConnected: false,
+        mobile: true,
+        inWalletBrowser: true,
+      }),
+    ).toBe('connect');
+  });
+
   it('prefers the installed Standard Wallet over a legacy duplicate', () => {
     const listed = preferReadyWallets([
       { adapter: { name: 'Backpack' }, readyState: WalletReadyState.NotDetected },
@@ -88,5 +129,13 @@ describe('gate debug overlay', () => {
 
   it('is visible only with development plus the env flag', () => {
     expect(isGateDebugEnabled(true, 'true')).toBe(true);
+  });
+});
+
+describe('wallet picker labels', () => {
+  it('uses Open in … only for the mobile browse action', () => {
+    expect(walletPickerLabel({ name: 'Backpack', action: 'connect' })).toBe('Backpack');
+    expect(walletPickerLabel({ name: 'Phantom', action: 'open-in-wallet' })).toBe('Open in Phantom');
+    expect(walletPickerLabel({ name: 'Solflare', action: 'install' })).toBe('Solflare');
   });
 });

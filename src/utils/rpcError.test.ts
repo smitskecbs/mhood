@@ -30,5 +30,6 @@ describe('RPC error handling', () => {
     expect(redactRpcUrl('https://rpc.example.com/solana?api-key=super-secret')).toBe(
       'https://rpc.example.com/solana',
     );
+    expect(redactRpcUrl('/api/rpc')).toBe('/api/rpc');
   });
 });

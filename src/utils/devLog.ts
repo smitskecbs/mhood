@@ -50,8 +50,11 @@ export function formatRpcError(err: unknown): string {
 }
 
 export function redactRpcUrl(url: string): string {
+  if (url.startsWith('/')) return url;
   try {
     const parsed = new URL(url);
+    parsed.search = '';
+    parsed.hash = '';
     return `${parsed.origin}${parsed.pathname}`;
   } catch {
     return '(invalid rpc url)';
