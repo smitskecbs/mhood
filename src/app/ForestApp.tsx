@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { COPY } from '../config/constants';
-import { isRealBurnEnabled } from '../config/env';
+import { isRealBurnEnabled, formatMintForLog, appConfig } from '../config/env';
 import { gateWalletUiDelayMs, getCinematicTiming } from '../config/timing';
 import { BackgroundLayers } from '../components/cinematic/BackgroundLayers';
 import { ForestDashboard } from '../components/ForestDashboard/ForestDashboard';
@@ -27,6 +27,7 @@ export function ForestApp() {
   const visuals = sceneVisualState(scene);
 
   useEffect(() => {
+    console.info(`[MoginHood] MHOOD mint configured: ${formatMintForLog(appConfig.mintAddress)}`);
     if (!import.meta.env.DEV) return;
     console.info(`[MoginHood] real burn enabled: ${isRealBurnEnabled()}`);
   }, []);

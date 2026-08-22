@@ -3,7 +3,7 @@ import { unpackMint } from '@solana/spl-token';
 import { PublicKey, type AccountInfo } from '@solana/web3.js';
 import { SPL_TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID as TOKEN_2022_ID } from '../../types';
 import type { MintDetails, TokenProgramKind } from '../../types';
-import { appConfig, requireConfiguredRpcUrl } from '../../config/env';
+import { appConfig, requireConfiguredRpcUrl, resolveMhoodMint } from '../../config/env';
 import {
   HOLDER_MINT_RPC_METHOD,
   HolderVerificationError,
@@ -156,11 +156,7 @@ function logMintAccountResponse(account: RpcMintAccountValue, bytes: Uint8Array,
 }
 
 function canonicalMintAddress(mintAddress: string): string {
-  const trimmed = mintAddress.trim();
-  if (!trimmed) {
-    throw new Error('Mint address is empty');
-  }
-  return new PublicKey(trimmed).toBase58();
+  return resolveMhoodMint(mintAddress);
 }
 
 async function loadMintDetails(mintAddress: string): Promise<MintDetails> {
@@ -284,14 +280,15 @@ export async function fetchMintDetails(
   _connection?: unknown,
   mintAddress = appConfig.mintAddress,
 ): Promise<MintDetails> {
-  if (cachedMint && cachedMint.mint === mintAddress) {
+  const mint = resolveMhoodMint(mintAddress);
+  if (cachedMint && cachedMint.mint === mint) {
     return cachedMint;
   }
   if (inFlightMint) {
     return inFlightMint;
   }
 
-  inFlightMint = loadMintDetails(mintAddress)
+  inFlightMint = loadMintDetails(mint)
     .then((details) => {
       cachedMint = details;
       return details;

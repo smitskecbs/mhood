@@ -1,14 +1,18 @@
-import { Connection } from '@solana/web3.js';
+import { Connection, PublicKey } from '@solana/web3.js';
 import { describe, expect, it } from 'vitest';
 import {
+  appConfig,
   clientUsesRpcProxy,
+  formatMintForLog,
   getConfiguredRpcUrl,
   isHttpRpcEndpoint,
   isRealBurnEnabled,
   parseRealBurnFlag,
   parseSolanaRpcUrl,
+  PUBLIC_MHOOD_MINT,
   requireConfiguredRpcUrl,
   resolveClientRpcUrl,
+  resolveMhoodMint,
   RPC_PROXY_PATH,
 } from './env';
 import { getConnection, getConnectionEndpoint, UNCONFIGURED_RPC_PLACEHOLDER } from '../services/solana/connection';
@@ -111,5 +115,29 @@ describe('Solana RPC env', () => {
     expect(parseRealBurnFlag(true)).toBe(true);
     expect(parseRealBurnFlag(false)).toBe(false);
     expect(isRealBurnEnabled()).toBe(parseRealBurnFlag(import.meta.env.VITE_ENABLE_REAL_BURN));
+  });
+
+  it('keeps the public MHOOD mint available when env is empty or missing', () => {
+    expect(PUBLIC_MHOOD_MINT).toBe('EiuaNV7T3Uz7yoVxkgxZQGXENreyBUqDWnfBLjbsYVVs');
+    expect(resolveMhoodMint(undefined)).toBe(PUBLIC_MHOOD_MINT);
+    expect(resolveMhoodMint('')).toBe(PUBLIC_MHOOD_MINT);
+    expect(resolveMhoodMint('   ')).toBe(PUBLIC_MHOOD_MINT);
+    expect(resolveMhoodMint(PUBLIC_MHOOD_MINT)).toBe(PUBLIC_MHOOD_MINT);
+    expect(new PublicKey(resolveMhoodMint('')).toBase58()).toBe(PUBLIC_MHOOD_MINT);
+    expect(resolveMhoodMint('')).not.toBe('');
+    expect(appConfig.mintAddress).toBeTruthy();
+    expect(() => new PublicKey(appConfig.mintAddress)).not.toThrow();
+    expect(formatMintForLog(PUBLIC_MHOOD_MINT)).toBe('Eiua...YVVs');
+  });
+
+  it('does not leak a Helius key through production RPC config', () => {
+    const endpoint = resolveClientRpcUrl({
+      isProd: true,
+      envUrl: 'https://mainnet.helius-rpc.com/?api-key=super-secret',
+      origin: 'https://mhood.cbs-coin.com',
+    });
+    expect(endpoint).toBe('https://mhood.cbs-coin.com/api/rpc');
+    expect(endpoint).not.toContain('helius-rpc');
+    expect(endpoint).not.toContain('api-key');
   });
 });

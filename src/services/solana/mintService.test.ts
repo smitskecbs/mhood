@@ -2,6 +2,7 @@ import { Buffer } from 'buffer';
 import { PublicKey } from '@solana/web3.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { COPY } from '../../config/constants';
+import { PUBLIC_MHOOD_MINT } from '../../config/env';
 import { SPL_TOKEN_PROGRAM_ID } from '../../types';
 import { formatHolderRpcError } from '../../utils/devLog';
 import { HOLDER_MINT_RPC_METHOD, HolderVerificationError } from '../../utils/holderVerificationError';
@@ -103,6 +104,24 @@ describe('mint account decoding', () => {
       expect(details.space).toBe(82);
       expect(details.decimals).toBe(6);
       expect(details.mint).toBe('EiuaNV7T3Uz7yoVxkgxZQGXENreyBUqDWnfBLjbsYVVs');
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it('never sends an empty mint string to getAccountInfo', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      status: 200,
+      json: async () => PRODUCTION_GET_ACCOUNT_INFO,
+    });
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = fetchImpl as unknown as typeof fetch;
+    try {
+      await fetchMintDetails(undefined, '');
+      const [, init] = fetchImpl.mock.calls[0] as [string, { body: string }];
+      const body = JSON.parse(init.body) as { method: string; params: unknown[] };
+      expect(body.params[0]).toBe(PUBLIC_MHOOD_MINT);
+      expect(body.params[0]).not.toBe('');
     } finally {
       globalThis.fetch = originalFetch;
     }

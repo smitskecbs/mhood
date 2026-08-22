@@ -1,11 +1,37 @@
+import { PublicKey } from '@solana/web3.js';
+
 const TRUE_VALUES = new Set(['true', '1', 'yes', 'on']);
 
 export const RPC_PROXY_PATH = '/api/rpc';
 export const RPC_NOT_CONFIGURED = 'Solana RPC endpoint is not configured.';
 
+/** Public MHOOD mint. Not a secret; safe to ship in the production bundle. */
+export const PUBLIC_MHOOD_MINT = 'EiuaNV7T3Uz7yoVxkgxZQGXENreyBUqDWnfBLjbsYVVs';
+
 function readEnv(name: keyof ImportMetaEnv, fallback = ''): string {
   const value = import.meta.env[name];
-  return typeof value === 'string' ? value.trim() : fallback;
+  if (typeof value !== 'string') return fallback;
+  const trimmed = value.trim();
+  return trimmed || fallback;
+}
+
+export function formatMintForLog(mint: string): string {
+  if (mint.length < 8) return mint;
+  return `${mint.slice(0, 4)}...${mint.slice(-4)}`;
+}
+
+/**
+ * Public protocol config. Empty/missing env must not reach mint-read.
+ * Reads `import.meta.env.VITE_MHOOD_MINT` statically so Vite can inline it.
+ */
+export function resolveMhoodMint(value: string | undefined | null = import.meta.env.VITE_MHOOD_MINT): string {
+  const trimmed = typeof value === 'string' ? value.trim() : '';
+  const candidate = trimmed || PUBLIC_MHOOD_MINT;
+  try {
+    return new PublicKey(candidate).toBase58();
+  } catch {
+    throw new Error(`Invalid MHOOD mint configuration: ${candidate}`);
+  }
 }
 
 function parseBoolean(value: string, fallback: boolean): boolean {
@@ -92,10 +118,7 @@ export const appConfig = {
       return '';
     }
   },
-  mintAddress: readEnv(
-    'VITE_MHOOD_MINT',
-    'EiuaNV7T3Uz7yoVxkgxZQGXENreyBUqDWnfBLjbsYVVs',
-  ),
+  mintAddress: resolveMhoodMint(import.meta.env.VITE_MHOOD_MINT),
   /**
    * Human-readable UI threshold, e.g. 1000000 = 1,000,000 MHOOD.
    * Converted to raw units only after on-chain decimals are known.
