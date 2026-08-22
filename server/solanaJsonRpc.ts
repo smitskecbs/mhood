@@ -25,6 +25,18 @@ export async function solanaJsonRpc<T>(
   }
 }
 
+export async function heliusRpc<T>(
+  method: string,
+  params: unknown[],
+  options?: { rpcUrl?: string; fetchImpl?: typeof fetch },
+): Promise<T> {
+  const rpcUrl = (options?.rpcUrl ?? process.env.HELIUS_RPC_URL ?? '').trim();
+  if (!rpcUrl) {
+    throw new Error('Solana RPC endpoint is not configured.');
+  }
+  return solanaJsonRpc<T>(rpcUrl, method, params, options?.fetchImpl ?? fetch);
+}
+
 export type SignatureInfo = {
   signature: string;
   err?: unknown;
@@ -46,7 +58,11 @@ export async function listSignaturesForAddress(
     const params: unknown[] = before
       ? [address, { limit, before }]
       : [address, { limit }];
-    const batch = await solanaJsonRpc<SignatureInfo[]>(rpcUrl, 'getSignaturesForAddress', params, fetchImpl);
+    const batch = await heliusRpc<SignatureInfo[]>(
+      'getSignaturesForAddress',
+      params,
+      { rpcUrl, fetchImpl },
+    );
     if (!Array.isArray(batch) || batch.length === 0) break;
     for (const item of batch) {
       if (item?.signature && item.err == null) signatures.push(item.signature);

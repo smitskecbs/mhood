@@ -22,4 +22,15 @@ describe('real burn architecture', () => {
     expect(burnService).not.toMatch(/onSignature\(/);
     expect(burnService).not.toMatch(/onAccountChange\(/);
   });
+
+  it('keeps server burn backfill on HTTP JSON-RPC without web3 Connection', () => {
+    const admin = readFileSync(path.resolve(process.cwd(), 'api/admin/backfill-burns.ts'), 'utf8');
+    const verify = readFileSync(path.resolve(process.cwd(), 'server/verifyOnChainBurn.ts'), 'utf8');
+    const core = readFileSync(path.resolve(process.cwd(), 'src/services/burnVerificationCore.ts'), 'utf8');
+    expect(admin).not.toMatch(/@solana\/web3\.js|rpc-websockets|verifiedBurnsApi/);
+    expect(verify).toMatch(/heliusRpc/);
+    expect(verify).toMatch(/burnVerificationCore/);
+    expect(verify).not.toMatch(/from ['"]@solana\/web3\.js['"]|rpc-websockets|new Connection/);
+    expect(core).not.toMatch(/from ['"]@solana\/web3\.js['"]|from ['"]@solana\/spl-token['"]|rpc-websockets/);
+  });
 });

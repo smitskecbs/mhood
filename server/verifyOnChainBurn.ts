@@ -1,7 +1,7 @@
-import { extractVerifiedMhoodBurnRecord } from '../src/services/burnVerification.js';
+import { extractVerifiedMhoodBurnRecord } from '../src/services/burnVerificationCore.js';
 import type { BurnRecord } from '../src/types/index.js';
 import { MHOOD_BURN_DECIMALS, MHOOD_BURN_MINT } from './knownMhoodBurns.js';
-import { solanaJsonRpc } from './solanaJsonRpc.js';
+import { heliusRpc } from './solanaJsonRpc.js';
 
 export type ParsedBurnTransaction = {
   slot: number;
@@ -18,11 +18,10 @@ export async function fetchParsedBurnTransaction(
   signature: string,
   fetchImpl: typeof fetch = fetch,
 ): Promise<ParsedBurnTransaction | null> {
-  return solanaJsonRpc<ParsedBurnTransaction | null>(
-    rpcUrl,
+  return heliusRpc<ParsedBurnTransaction | null>(
     'getTransaction',
     [signature, { encoding: 'jsonParsed', maxSupportedTransactionVersion: 0, commitment: 'confirmed' }],
-    fetchImpl,
+    { rpcUrl, fetchImpl },
   );
 }
 

@@ -1,6 +1,4 @@
-import { backfillVerifiedBurns } from '../../server/backfillVerifiedBurns.js';
-import { createVerifiedBurnStore } from '../../server/createVerifiedBurnStore.js';
-import { authorizeBackfillRequest } from '../../server/verifiedBurnsApi.js';
+import { handleAdminBackfillRequest } from '../../server/adminBackfill.js';
 
 export const config = {
   runtime: 'nodejs',
@@ -8,34 +6,20 @@ export const config = {
 };
 
 export async function POST(request: Request): Promise<Response> {
-  if (!authorizeBackfillRequest(request)) {
-    return Response.json({ error: 'Not found' }, { status: 404 });
-  }
-  const rpcUrl = (process.env.HELIUS_RPC_URL ?? '').trim();
-  if (!rpcUrl) {
-    return Response.json({ error: 'Solana RPC endpoint is not configured.' }, { status: 503 });
-  }
-  const store = createVerifiedBurnStore(process.env);
-  if (store.persistence === 'inactive') {
-    return Response.json(
-      { error: 'Persistent burn storage is not configured.' },
-      { status: 503 },
-    );
-  }
-  const result = await backfillVerifiedBurns({ rpcUrl, store });
-  return Response.json({
-    ok: true,
-    persistence: store.persistence,
-    scanned: result.scanned,
-    imported: result.imported.length,
-    duplicates: result.duplicates.length,
-    rejected: result.rejected.length,
-    records: result.imported,
+  const result = await handleAdminBackfillRequest({
+    httpMethod: 'POST',
+    headers: request.headers,
+    env: process.env,
   });
+  return Response.json(result.body, { status: result.status });
 }
 
 export async function GET(): Promise<Response> {
-  return Response.json({ error: 'Not found' }, { status: 404 });
+  const result = await handleAdminBackfillRequest({
+    httpMethod: 'GET',
+    env: process.env,
+  });
+  return Response.json(result.body, { status: result.status });
 }
 
 export default async function handler(request: Request): Promise<Response> {

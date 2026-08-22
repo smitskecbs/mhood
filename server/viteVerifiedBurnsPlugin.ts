@@ -2,7 +2,8 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { loadEnv, type Plugin } from 'vite';
 import { readJsonBody, sendJson } from './httpJson.js';
 import { handleJsonRpcProxy } from './rpcProxy.js';
-import { handleVerifiedBurnsRequest, authorizeBackfillRequest } from './verifiedBurnsApi.js';
+import { authorizeBackfillRequest } from './backfillAuth.js';
+import { handleVerifiedBurnsRequest } from './verifiedBurnsApi.js';
 import { createVerifiedBurnStore } from './createVerifiedBurnStore.js';
 import { backfillVerifiedBurns } from './backfillVerifiedBurns.js';
 
