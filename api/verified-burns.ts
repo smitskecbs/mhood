@@ -1,19 +1,33 @@
-import type { IncomingMessage, ServerResponse } from 'node:http';
-import { readJsonBody, sendJson } from '../server/httpJson';
 import { handleVerifiedBurnsRequest } from '../server/verifiedBurnsApi';
 
-export default async function handler(req: IncomingMessage, res: ServerResponse): Promise<void> {
-  try {
-    const body = req.method === 'POST' ? await readJsonBody(req) : null;
-    const result = await handleVerifiedBurnsRequest({
-      httpMethod: req.method ?? 'GET',
-      body,
-      persistence: 'inactive',
-      records: [],
-      rpcUrl: process.env.HELIUS_RPC_URL ?? '',
-    });
-    sendJson(res, result.status, result.body);
-  } catch {
-    sendJson(res, 400, { error: 'Invalid burn payload.' });
+export const config = {
+  runtime: 'nodejs',
+  maxDuration: 30,
+};
+
+async function verifiedBurnsFromRequest(request: Request): Promise<Response> {
+  let body: unknown = null;
+  if (request.method === 'POST') {
+    try {
+      body = await request.json();
+    } catch {
+      return Response.json({ error: 'Invalid burn payload.' }, { status: 400 });
+    }
   }
+  const result = await handleVerifiedBurnsRequest({
+    httpMethod: request.method,
+    body,
+    persistence: 'inactive',
+    records: [],
+    rpcUrl: process.env.HELIUS_RPC_URL ?? '',
+  });
+  return Response.json(result.body, { status: result.status });
+}
+
+export async function GET(request: Request): Promise<Response> {
+  return verifiedBurnsFromRequest(request);
+}
+
+export async function POST(request: Request): Promise<Response> {
+  return verifiedBurnsFromRequest(request);
 }

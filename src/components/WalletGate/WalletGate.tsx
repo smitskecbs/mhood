@@ -12,8 +12,8 @@ import {
 } from '../../config/wallets';
 import {
   buildWalletBrowseUrl,
+  canonicalDappUrl,
   detectMobileWalletContext,
-  navigateToWalletBrowse,
   WALLET_INSTALL_URLS,
 } from '../../utils/mobileWallet';
 import { formatTokenAmount, uiAmountToRaw } from '../../utils/tokenAmount';
@@ -63,8 +63,8 @@ export function WalletGate({
   const { connectError, clearConnectError } = useWalletUi();
   const [phase, setPhase] = useState<WalletFlowPhase>('idle');
   const [pickError, setPickError] = useState<string | null>(null);
-  const [installFallback, setInstallFallback] = useState<string | null>(null);
   const walletContext = detectMobileWalletContext();
+  const dappUrl = canonicalDappUrl();
   const inFlight = useRef(false);
   const connectLogged = useRef(false);
   const connectRef = useRef(connect);
@@ -140,7 +140,6 @@ export function WalletGate({
     }
     clearConnectError();
     setPickError(null);
-    setInstallFallback(null);
     setPhase((current) => reduceWalletFlow(current, { type: 'open-picker' }));
     logGateTiming('wallet picker opened', `+${msSinceClick()}ms`);
   }
@@ -160,20 +159,12 @@ export function WalletGate({
     }
 
     if (action === 'open-in-wallet') {
-      const dappUrl = typeof window !== 'undefined' ? window.location.href : '';
-      const origin = typeof window !== 'undefined' ? window.location.origin : '';
-      const browse = buildWalletBrowseUrl(adapter.name, dappUrl, origin);
-      setInstallFallback(adapter.name);
-      if (browse) {
-        navigateToWalletBrowse(browse);
-      }
       return;
     }
 
     if (action === 'install') {
       const message = formatWalletConnectError({ name: 'WalletNotReadyError' }, adapter.name);
       setPickError(message);
-      setInstallFallback(adapter.name);
       devLog(`${adapter.name} connect error: ${message}`);
       if (adapter.url && typeof window !== 'undefined') {
         window.open(adapter.url, '_blank', 'noreferrer');
@@ -264,37 +255,44 @@ export function WalletGate({
                 mobile: walletContext.mobile,
                 inWalletBrowser: walletContext.inWalletBrowser,
               });
+              const browseUrl =
+                action === 'open-in-wallet' ? buildWalletBrowseUrl(item.adapter.name, dappUrl, dappUrl) : null;
+              const label = walletPickerLabel({ name: item.adapter.name, action });
+              const detected = isReadyLabel(item.readyState) || walletContext.inWalletBrowser;
               return (
                 <li key={item.adapter.name}>
-                  <button
-                    type="button"
-                    className="wallet-picker__button"
-                    disabled={connectingThisWallet}
-                    onClick={() => void pickWallet(item)}
-                  >
-                    <span>{walletPickerLabel({ name: item.adapter.name, action })}</span>
-                    {isReadyLabel(item.readyState) || walletContext.inWalletBrowser ? (
-                      <span className="wallet-picker__detected">Detected</span>
-                    ) : null}
-                  </button>
+                  {browseUrl ? (
+                    <a className="wallet-picker__button" href={browseUrl} target="_self" rel="noopener">
+                      <span>{label}</span>
+                    </a>
+                  ) : (
+                    <button
+                      type="button"
+                      className="wallet-picker__button"
+                      disabled={connectingThisWallet}
+                      onClick={() => void pickWallet(item)}
+                    >
+                      <span>{label}</span>
+                      {detected ? <span className="wallet-picker__detected">Detected</span> : null}
+                    </button>
+                  )}
                 </li>
               );
             })}
           </ul>
         ) : null}
 
-        {showPicker && installFallback ? (
+        {showPicker && walletContext.mobile && !walletContext.inWalletBrowser ? (
           <p className="gate-wallet-fallback">
-            <button
-              type="button"
-              className="forest-button forest-button--ghost"
-              onClick={() => {
-                const url = WALLET_INSTALL_URLS[installFallback];
-                if (url) window.open(url, '_blank', 'noreferrer');
-              }}
-            >
-              {`Get ${installFallback}`}
-            </button>
+            {listed.map((item) => {
+              const url = WALLET_INSTALL_URLS[item.adapter.name];
+              if (!url) return null;
+              return (
+                <a key={item.adapter.name} className="gate-wallet-fallback__link" href={url} target="_blank" rel="noopener noreferrer">
+                  {`Get ${item.adapter.name}`}
+                </a>
+              );
+            })}
           </p>
         ) : null}
 

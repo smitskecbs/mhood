@@ -2,10 +2,9 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { WalletGate } from './WalletGate';
 
-const { select, connect, navigateToWalletBrowse } = vi.hoisted(() => ({
+const { select, connect } = vi.hoisted(() => ({
   select: vi.fn(),
   connect: vi.fn(async () => undefined),
-  navigateToWalletBrowse: vi.fn(),
 }));
 
 vi.mock('@solana/wallet-adapter-react', () => ({
@@ -38,12 +37,11 @@ vi.mock('../../utils/mobileWallet', async () => {
   return {
     ...actual,
     detectMobileWalletContext: () => ({ mobile: true, inWalletBrowser: false }),
-    navigateToWalletBrowse,
   };
 });
 
 describe('WalletGate mobile browse links', () => {
-  it('opens official wallet browse links instead of the download page', () => {
+  it('uses official browse hrefs so a user click opens the dapp in the wallet browser', () => {
     Object.defineProperty(window, 'location', {
       configurable: true,
       value: {
@@ -64,18 +62,21 @@ describe('WalletGate mobile browse links', () => {
       />,
     );
     fireEvent.click(screen.getByRole('button', { name: /open the gate/i }));
-    expect(screen.getByRole('button', { name: 'Open in Backpack' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Open in Phantom' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Open in Solflare' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Get Backpack' })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open in Phantom' }));
-    expect(navigateToWalletBrowse).toHaveBeenCalledTimes(1);
-    expect(navigateToWalletBrowse.mock.calls[0]?.[0]).toContain('https://phantom.app/ul/browse/');
-    expect(navigateToWalletBrowse.mock.calls[0]?.[0]).toContain(encodeURIComponent('https://mhood.cbs-coin.com/'));
-    expect(navigateToWalletBrowse.mock.calls[0]?.[0]).not.toContain('phantom.app/download');
+    const encoded = encodeURIComponent('https://mhood.cbs-coin.com');
+    const backpack = screen.getByRole('link', { name: 'Open in Backpack' });
+    const phantom = screen.getByRole('link', { name: 'Open in Phantom' });
+    const solflare = screen.getByRole('link', { name: 'Open in Solflare' });
+
+    expect(backpack).toHaveAttribute('href', `https://backpack.app/ul/v1/browse/${encoded}?ref=${encoded}`);
+    expect(phantom).toHaveAttribute('href', `https://phantom.app/ul/browse/${encoded}?ref=${encoded}`);
+    expect(solflare).toHaveAttribute('href', `https://solflare.com/ul/v1/browse/${encoded}?ref=${encoded}`);
+    expect(backpack.getAttribute('href')).toContain(encoded);
+    expect(phantom.getAttribute('href')).not.toContain('phantom.app/download');
     expect(select).not.toHaveBeenCalled();
     expect(connect).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: 'Get Phantom' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Get Backpack' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Get Phantom' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Get Solflare' })).toBeInTheDocument();
   });
 });

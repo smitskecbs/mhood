@@ -31,9 +31,9 @@ describe('Solana RPC env', () => {
         envUrl: 'https://mainnet.helius-rpc.com/?api-key=super-secret',
         origin: 'https://mhood.cbs-coin.com',
       }),
-    ).toBe('https://mhood.cbs-coin.com/api/rpc');
-    expect(clientUsesRpcProxy('https://mhood.cbs-coin.com/api/rpc')).toBe(true);
+    ).toBe('/api/rpc');
     expect(clientUsesRpcProxy(RPC_PROXY_PATH)).toBe(true);
+    expect(clientUsesRpcProxy('https://mhood.cbs-coin.com/api/rpc')).toBe(true);
     expect(clientUsesRpcProxy('https://mainnet.helius-rpc.com/?api-key=super-secret')).toBe(false);
   });
 

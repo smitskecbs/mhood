@@ -2,10 +2,9 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { WalletGate } from './WalletGate';
 
-const { select, connect, navigateToWalletBrowse } = vi.hoisted(() => ({
+const { select, connect } = vi.hoisted(() => ({
   select: vi.fn(),
   connect: vi.fn(async () => undefined),
-  navigateToWalletBrowse: vi.fn(),
 }));
 
 vi.mock('@solana/wallet-adapter-react', () => ({
@@ -30,7 +29,6 @@ vi.mock('../../utils/mobileWallet', async () => {
   return {
     ...actual,
     detectMobileWalletContext: () => ({ mobile: true, inWalletBrowser: true }),
-    navigateToWalletBrowse,
   };
 });
 
@@ -47,10 +45,11 @@ describe('WalletGate inside a wallet browser', () => {
       />,
     );
     fireEvent.click(screen.getByRole('button', { name: /open the gate/i }));
+    expect(screen.queryByRole('link', { name: /open in phantom/i })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /phantom/i }));
     await waitFor(() => {
       expect(select).toHaveBeenCalledWith('Phantom');
     });
-    expect(navigateToWalletBrowse).not.toHaveBeenCalled();
+    expect(connect).toHaveBeenCalled();
   });
 });

@@ -1,14 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildWalletBrowseUrl,
+  canonicalDappUrl,
+  detectInjectedWallets,
   detectMobileWalletContext,
   isInSolanaWalletBrowser,
   isMobileUserAgent,
   WALLET_INSTALL_URLS,
 } from './mobileWallet';
 
-const DAPP = 'https://mhood.cbs-coin.com/';
-const ORIGIN = 'https://mhood.cbs-coin.com';
+const DAPP = 'https://mhood.cbs-coin.com';
 
 describe('mobile wallet detection', () => {
   it('treats phones as mobile and desktops as not', () => {
@@ -17,11 +18,13 @@ describe('mobile wallet detection', () => {
     expect(isMobileUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0')).toBe(false);
   });
 
-  it('detects an in-app wallet browser from provider or UA', () => {
+  it('detects an in-app wallet browser from injected providers, not only user agent', () => {
+    expect(detectInjectedWallets({ phantom: { solana: {} } }).phantom).toBe(true);
+    expect(detectInjectedWallets({ backpack: {} }).backpack).toBe(true);
+    expect(detectInjectedWallets({ solflare: {} }).solflare).toBe(true);
     expect(isInSolanaWalletBrowser({ phantom: true })).toBe(true);
     expect(isInSolanaWalletBrowser({ backpack: true })).toBe(true);
     expect(isInSolanaWalletBrowser({ solflare: true })).toBe(true);
-    expect(isInSolanaWalletBrowser({ ua: 'Mozilla/5.0 Phantom/25.0' })).toBe(true);
     expect(isInSolanaWalletBrowser({ ua: 'Mozilla/5.0 (iPhone)' })).toBe(false);
   });
 
@@ -36,17 +39,22 @@ describe('mobile wallet detection', () => {
 });
 
 describe('official wallet browse links', () => {
-  it('builds Phantom, Solflare and Backpack browse URLs for the live dapp', () => {
-    expect(buildWalletBrowseUrl('Phantom', DAPP, ORIGIN)).toBe(
-      `https://phantom.app/ul/browse/${encodeURIComponent(DAPP)}?ref=${encodeURIComponent(ORIGIN)}`,
+  it('encodes the live dapp origin for Phantom, Solflare and Backpack browse routes', () => {
+    const encoded = encodeURIComponent(DAPP);
+    expect(canonicalDappUrl('https://mhood.cbs-coin.com/#gate', DAPP)).toBe(DAPP);
+    expect(buildWalletBrowseUrl('Phantom', `${DAPP}/`, DAPP)).toBe(
+      `https://phantom.app/ul/browse/${encoded}?ref=${encoded}`,
     );
-    expect(buildWalletBrowseUrl('Solflare', DAPP, ORIGIN)).toBe(
-      `https://solflare.com/ul/v1/browse/${encodeURIComponent(DAPP)}?ref=${encodeURIComponent(ORIGIN)}`,
+    expect(buildWalletBrowseUrl('Solflare', DAPP, DAPP)).toBe(
+      `https://solflare.com/ul/v1/browse/${encoded}?ref=${encoded}`,
     );
-    expect(buildWalletBrowseUrl('Backpack', DAPP, ORIGIN)).toBe(
-      `https://backpack.app/ul/v1/browse/${encodeURIComponent(DAPP)}?ref=${encodeURIComponent(ORIGIN)}`,
+    expect(buildWalletBrowseUrl('Backpack', DAPP, DAPP)).toBe(
+      `https://backpack.app/ul/v1/browse/${encoded}?ref=${encoded}`,
     );
-    expect(buildWalletBrowseUrl('Unknown', DAPP, ORIGIN)).toBeNull();
+    expect(buildWalletBrowseUrl('Phantom', DAPP, DAPP)).toContain(encoded);
+    expect(buildWalletBrowseUrl('Backpack', DAPP, DAPP)).toContain(encoded);
+    expect(buildWalletBrowseUrl('Solflare', DAPP, DAPP)).toContain(encoded);
+    expect(buildWalletBrowseUrl('Unknown', DAPP, DAPP)).toBeNull();
   });
 
   it('keeps install URLs as a fallback, not the first hop', () => {

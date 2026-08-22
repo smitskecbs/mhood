@@ -43,13 +43,8 @@ function developmentRpcFromEnv(): string {
   return readEnv('VITE_SOLANA_RPC_URL');
 }
 
-function sameOriginProxy(origin: string): string {
-  if (!origin) return RPC_PROXY_PATH;
-  return `${origin.replace(/\/$/, '')}${RPC_PROXY_PATH}`;
-}
-
 /**
- * Production always uses the same-origin `/api/rpc` proxy.
+ * Production always uses the same-origin `/api/rpc` proxy (relative, never Helius).
  * Development may still point at a direct RPC URL from `.env` for local convenience.
  */
 export function resolveClientRpcUrl(options?: {
@@ -58,23 +53,21 @@ export function resolveClientRpcUrl(options?: {
   origin?: string;
 }): string {
   const isProd = options?.isProd ?? import.meta.env.PROD;
-  const origin =
-    options?.origin ?? (typeof window !== 'undefined' && window.location?.origin ? window.location.origin : '');
 
   if (isProd) {
-    return sameOriginProxy(origin);
+    return RPC_PROXY_PATH;
   }
 
   const parsed = parseSolanaRpcUrl(options?.envUrl ?? developmentRpcFromEnv());
   if (parsed && parsed !== RPC_PROXY_PATH && !parsed.startsWith('/')) {
     return parsed;
   }
-  return sameOriginProxy(origin);
+  return RPC_PROXY_PATH;
 }
 
 export const appConfig = {
   /**
-   * Browser RPC. Production is always `/api/rpc` (absolute when window origin is known).
+   * Browser RPC. Production is always the relative same-origin proxy `/api/rpc`.
    */
   rpcUrl: resolveClientRpcUrl(),
   mintAddress: readEnv(

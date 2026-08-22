@@ -1,3 +1,5 @@
+export const FOREST_DAPP_ORIGIN = 'https://mhood.cbs-coin.com';
+
 export function isMobileUserAgent(ua: string): boolean {
   return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(ua);
 }
@@ -5,8 +7,10 @@ export function isMobileUserAgent(ua: string): boolean {
 type InjectedWalletWindow = {
   phantom?: { solana?: unknown };
   backpack?: unknown;
+  xnft?: unknown;
   solflare?: unknown;
-  solana?: { isPhantom?: boolean; isSolflare?: boolean };
+  solana?: { isPhantom?: boolean; isSolflare?: boolean; isBackpack?: boolean };
+  navigator?: { wallets?: unknown };
 };
 
 export function detectInjectedWallets(win: InjectedWalletWindow): {
@@ -16,7 +20,7 @@ export function detectInjectedWallets(win: InjectedWalletWindow): {
 } {
   return {
     phantom: Boolean(win.phantom?.solana || win.solana?.isPhantom),
-    backpack: Boolean(win.backpack),
+    backpack: Boolean(win.backpack || win.xnft || win.solana?.isBackpack),
     solflare: Boolean(win.solflare || win.solana?.isSolflare),
   };
 }
@@ -50,15 +54,27 @@ export const WALLET_INSTALL_URLS: Record<string, string> = {
   Solflare: 'https://solflare.com/download',
 };
 
+/** Origin only: wallets open this URL in their in-app browser. No path/hash/query. */
+export function canonicalDappUrl(href?: string, origin?: string): string {
+  const candidate = origin || href || (typeof window !== 'undefined' ? window.location.origin : FOREST_DAPP_ORIGIN);
+  try {
+    return new URL(candidate).origin;
+  } catch {
+    return FOREST_DAPP_ORIGIN;
+  }
+}
+
 /**
- * Official browse universal links. Path segment is the URL-encoded dapp URL.
+ * Official browse universal links. The path segment is the URL-encoded dapp URL.
+ * These must be opened by a real user click on an `<a href>` (not a JS redirect).
  * @see https://docs.phantom.com/phantom-deeplinks/other-methods/browse
  * @see https://docs.solflare.com/solflare/technical/deeplinks/other-methods/browse
  * @see https://docs.backpack.app/deeplinks/other-methods/browse
  */
 export function buildWalletBrowseUrl(walletName: string, dappUrl: string, refOrigin: string): string | null {
-  const encodedUrl = encodeURIComponent(dappUrl);
-  const encodedRef = encodeURIComponent(refOrigin);
+  const target = canonicalDappUrl(dappUrl, refOrigin);
+  const encodedUrl = encodeURIComponent(target);
+  const encodedRef = encodeURIComponent(target);
   switch (walletName) {
     case 'Phantom':
       return `https://phantom.app/ul/browse/${encodedUrl}?ref=${encodedRef}`;
@@ -69,13 +85,4 @@ export function buildWalletBrowseUrl(walletName: string, dappUrl: string, refOri
     default:
       return null;
   }
-}
-
-export function navigateToWalletBrowse(
-  url: string,
-  assign: (href: string) => void = (href) => {
-    window.location.assign(href);
-  },
-): void {
-  assign(url);
 }
