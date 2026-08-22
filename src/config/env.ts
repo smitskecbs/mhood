@@ -43,8 +43,24 @@ function developmentRpcFromEnv(): string {
   return readEnv('VITE_SOLANA_RPC_URL');
 }
 
+function browserOrigin(explicit?: string): string {
+  const value = explicit ?? (typeof window !== 'undefined' ? window.location?.origin : '');
+  return typeof value === 'string' ? value.replace(/\/$/, '') : '';
+}
+
+export function isHttpRpcEndpoint(url: string): boolean {
+  return /^https?:\/\//i.test(url);
+}
+
+function sameOriginRpcProxy(origin: string): string {
+  if (!origin) {
+    throw new Error('Client RPC endpoint unavailable');
+  }
+  return `${origin}${RPC_PROXY_PATH}`;
+}
+
 /**
- * Production always uses the same-origin `/api/rpc` proxy (relative, never Helius).
+ * Production always uses the same-origin `/api/rpc` proxy as an absolute URL.
  * Development may still point at a direct RPC URL from `.env` for local convenience.
  */
 export function resolveClientRpcUrl(options?: {
@@ -53,23 +69,29 @@ export function resolveClientRpcUrl(options?: {
   origin?: string;
 }): string {
   const isProd = options?.isProd ?? import.meta.env.PROD;
+  const origin = browserOrigin(options?.origin);
 
-  if (isProd) {
-    return RPC_PROXY_PATH;
+  if (!isProd) {
+    const parsed = parseSolanaRpcUrl(options?.envUrl ?? developmentRpcFromEnv());
+    if (parsed && isHttpRpcEndpoint(parsed)) {
+      return parsed;
+    }
   }
 
-  const parsed = parseSolanaRpcUrl(options?.envUrl ?? developmentRpcFromEnv());
-  if (parsed && parsed !== RPC_PROXY_PATH && !parsed.startsWith('/')) {
-    return parsed;
-  }
-  return RPC_PROXY_PATH;
+  return sameOriginRpcProxy(origin);
 }
 
 export const appConfig = {
   /**
-   * Browser RPC. Production is always the relative same-origin proxy `/api/rpc`.
+   * Browser RPC. Production is always `${origin}/api/rpc` (never a Helius URL).
    */
-  rpcUrl: resolveClientRpcUrl(),
+  get rpcUrl(): string {
+    try {
+      return resolveClientRpcUrl();
+    } catch {
+      return '';
+    }
+  },
   mintAddress: readEnv(
     'VITE_MHOOD_MINT',
     'EiuaNV7T3Uz7yoVxkgxZQGXENreyBUqDWnfBLjbsYVVs',
@@ -99,8 +121,12 @@ export const appConfig = {
 };
 
 export function getConfiguredRpcUrl(): string | null {
-  const url = resolveClientRpcUrl();
-  return url || null;
+  try {
+    const url = resolveClientRpcUrl();
+    return url && isHttpRpcEndpoint(url) ? url : null;
+  } catch {
+    return null;
+  }
 }
 
 export function requireConfiguredRpcUrl(): string {

@@ -1,5 +1,5 @@
 import { Connection } from '@solana/web3.js';
-import { clientUsesRpcProxy, getConfiguredRpcUrl, requireConfiguredRpcUrl, RPC_PROXY_PATH } from '../../config/env';
+import { getConfiguredRpcUrl, isHttpRpcEndpoint, requireConfiguredRpcUrl } from '../../config/env';
 import { redactRpcUrl } from '../../utils/devLog';
 
 /**
@@ -16,18 +16,30 @@ let loggedClientEndpoint = false;
 function logClientRpcEndpoint(endpoint: string): void {
   if (loggedClientEndpoint) return;
   loggedClientEndpoint = true;
-  const label = clientUsesRpcProxy(endpoint) ? RPC_PROXY_PATH : redactRpcUrl(endpoint);
-  console.info(`[MoginHood] client RPC endpoint: ${label}`);
+  console.info(`[MoginHood] client RPC endpoint: ${redactRpcUrl(endpoint)}`);
+}
+
+export function safeHttpRpcEndpoint(url: string): string {
+  return isHttpRpcEndpoint(url) ? url : UNCONFIGURED_RPC_PLACEHOLDER;
 }
 
 export function getConnectionEndpoint(): string {
-  const endpoint = getConfiguredRpcUrl() ?? UNCONFIGURED_RPC_PLACEHOLDER;
-  logClientRpcEndpoint(endpoint);
-  return endpoint;
+  try {
+    const configured = getConfiguredRpcUrl();
+    const endpoint = configured ? safeHttpRpcEndpoint(configured) : UNCONFIGURED_RPC_PLACEHOLDER;
+    logClientRpcEndpoint(endpoint);
+    return endpoint;
+  } catch {
+    logClientRpcEndpoint(UNCONFIGURED_RPC_PLACEHOLDER);
+    return UNCONFIGURED_RPC_PLACEHOLDER;
+  }
 }
 
 export function getConnection(): Connection {
   const endpoint = requireConfiguredRpcUrl();
+  if (!isHttpRpcEndpoint(endpoint)) {
+    throw new Error('Endpoint URL must start with `http:` or `https:`.');
+  }
   logClientRpcEndpoint(endpoint);
   if (!connection || connectionEndpoint !== endpoint) {
     connection = new Connection(endpoint, { commitment: 'confirmed' });
@@ -39,4 +51,5 @@ export function getConnection(): Connection {
 export function resetConnection(): void {
   connection = null;
   connectionEndpoint = null;
+  loggedClientEndpoint = false;
 }
