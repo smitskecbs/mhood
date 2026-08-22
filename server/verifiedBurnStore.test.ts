@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { handleVerifiedBurnsRequest } from './verifiedBurnsApi.js';
-import { MemoryVerifiedBurnStore, UpstashVerifiedBurnStore } from './verifiedBurnStore.js';
+import {
+  MemoryVerifiedBurnStore,
+  UpstashVerifiedBurnStore,
+  createUpstashVerifiedBurnStore,
+  readUpstashCredentials,
+  resetUpstashCredentialLog,
+} from './verifiedBurnStore.js';
+import { createVerifiedBurnStore } from './createVerifiedBurnStore.js';
 import type { BurnRecord } from '../src/types/index.js';
 
 const wallet = 'memekrM9YqzBQBmHjgne8CHeaPicxwFDxeMo3bkHwMY';
@@ -79,5 +86,92 @@ describe('verified burn persistence', () => {
     expect((await store.add(record('sig-a'))).added).toBe(true);
     expect((await store.add(record('sig-a'))).added).toBe(false);
     expect(await store.list()).toHaveLength(1);
+  });
+});
+
+describe('Upstash REST credential env names', () => {
+  it('selects UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN when both are set', () => {
+    const credentials = readUpstashCredentials({
+      UPSTASH_REDIS_REST_URL: 'https://upstash.example/rest',
+      UPSTASH_REDIS_REST_TOKEN: 'upstash-write-token',
+      KV_REST_API_URL: 'https://kv.example/rest',
+      KV_REST_API_TOKEN: 'kv-write-token',
+      KV_REST_API_READ_ONLY_TOKEN: 'kv-readonly-token',
+    });
+    expect(credentials).toMatchObject({
+      source: 'upstash',
+      urlEnv: 'UPSTASH_REDIS_REST_URL',
+      tokenEnv: 'UPSTASH_REDIS_REST_TOKEN',
+      url: 'https://upstash.example/rest',
+      token: 'upstash-write-token',
+    });
+  });
+
+  it('falls back to KV_REST_API_URL / KV_REST_API_TOKEN when Upstash names are absent', () => {
+    const credentials = readUpstashCredentials({
+      KV_REST_API_URL: 'https://kv.example/rest',
+      KV_REST_API_TOKEN: 'kv-write-token',
+      KV_REST_API_READ_ONLY_TOKEN: 'kv-readonly-token',
+      KV_URL: 'rediss://example.upstash.io:6379',
+      REDIS_URL: 'rediss://example.upstash.io:6379',
+    });
+    expect(credentials).toMatchObject({
+      source: 'vercel-kv',
+      urlEnv: 'KV_REST_API_URL',
+      tokenEnv: 'KV_REST_API_TOKEN',
+      url: 'https://kv.example/rest',
+      token: 'kv-write-token',
+    });
+    expect(credentials?.token).not.toBe('kv-readonly-token');
+  });
+
+  it('does not mix a partial Upstash pair with the read-only token; complete KV pair still wins', () => {
+    expect(
+      readUpstashCredentials({
+        UPSTASH_REDIS_REST_URL: 'https://upstash.example/rest',
+        KV_REST_API_URL: 'https://kv.example/rest',
+        KV_REST_API_TOKEN: 'kv-write-token',
+        KV_REST_API_READ_ONLY_TOKEN: 'kv-readonly-token',
+      }),
+    ).toMatchObject({
+      urlEnv: 'KV_REST_API_URL',
+      tokenEnv: 'KV_REST_API_TOKEN',
+      token: 'kv-write-token',
+    });
+  });
+
+  it('never uses the read-only KV token or redis:// URLs for writes', () => {
+    expect(
+      readUpstashCredentials({
+        KV_REST_API_URL: 'https://kv.example/rest',
+        KV_REST_API_READ_ONLY_TOKEN: 'kv-readonly-token',
+        KV_URL: 'rediss://example.upstash.io:6379',
+        REDIS_URL: 'rediss://example.upstash.io:6379',
+      }),
+    ).toBeNull();
+    expect(
+      readUpstashCredentials({
+        UPSTASH_REDIS_REST_URL: 'https://upstash.example/rest',
+        KV_REST_API_READ_ONLY_TOKEN: 'kv-readonly-token',
+      }),
+    ).toBeNull();
+  });
+
+  it('activates the Upstash store from either complete env-name set', () => {
+    resetUpstashCredentialLog();
+    expect(
+      createVerifiedBurnStore({
+        UPSTASH_REDIS_REST_URL: 'https://upstash.example/rest',
+        UPSTASH_REDIS_REST_TOKEN: 'upstash-write-token',
+      }).kind,
+    ).toBe('upstash');
+    expect(
+      createVerifiedBurnStore({
+        KV_REST_API_URL: 'https://kv.example/rest',
+        KV_REST_API_TOKEN: 'kv-write-token',
+        KV_REST_API_READ_ONLY_TOKEN: 'kv-readonly-token',
+      }).kind,
+    ).toBe('upstash');
+    expect(createUpstashVerifiedBurnStore({})).toBeNull();
   });
 });

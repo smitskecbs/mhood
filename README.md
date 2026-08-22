@@ -176,13 +176,12 @@ Forest Legends toont alleen **on-chain geverifieerde** `BurnRecord`s:
 
 De lokale demo bewaart verified signatures via `GET/POST /api/verified-burns` (Vite-dev middleware, bestand `data/verified-burns.json`). De browser is geen source of truth: POST stuurt alleen een signature, de server haalt de transactie op en controleert BurnChecked (mint, authority, amount) voordat een record wordt toegevoegd. Dubbele signatures worden genegeerd.
 
-Productie gebruikt **Upstash Redis** (Vercel Marketplace; Vercel KV is deprecated). Zet server-only:
+Productie gebruikt **Upstash Redis** (Vercel Marketplace). De store zoekt server-only REST credentials in deze volgorde:
 
-```env
-UPSTASH_REDIS_REST_URL=
-UPSTASH_REDIS_REST_TOKEN=
-BURN_BACKFILL_SECRET=
-```
+1. `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN`
+2. fallback `KV_REST_API_URL` + `KV_REST_API_TOKEN` (huidige Vercel injectie)
+
+Nooit `KV_REST_API_READ_ONLY_TOKEN`, `KV_URL`, `REDIS_URL` of `VITE_*`. Writes gaan alleen met de write-token.
 
 Daarna bestaande burns één keer importeren:
 

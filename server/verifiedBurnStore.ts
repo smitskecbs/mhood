@@ -124,11 +124,64 @@ export class UpstashVerifiedBurnStore implements VerifiedBurnStore {
   }
 }
 
-export function readUpstashCredentials(env: NodeJS.Dict<string>): { url: string; token: string } | null {
-  const url = (env.UPSTASH_REDIS_REST_URL || env.KV_REST_API_URL || '').trim();
-  const token = (env.UPSTASH_REDIS_REST_TOKEN || env.KV_REST_API_TOKEN || '').trim();
-  if (!url || !token) return null;
-  return { url, token };
+export type UpstashCredentialSource = 'upstash' | 'vercel-kv';
+
+export type UpstashCredentials = {
+  url: string;
+  token: string;
+  source: UpstashCredentialSource;
+  urlEnv: 'UPSTASH_REDIS_REST_URL' | 'KV_REST_API_URL';
+  tokenEnv: 'UPSTASH_REDIS_REST_TOKEN' | 'KV_REST_API_TOKEN';
+};
+
+function envText(env: NodeJS.Dict<string>, name: string): string {
+  const value = env[name];
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+/**
+ * Production Upstash REST credentials.
+ * Prefer UPSTASH_REDIS_REST_* when both are set; otherwise KV_REST_API_URL + KV_REST_API_TOKEN.
+ * Never uses KV_REST_API_READ_ONLY_TOKEN, KV_URL, REDIS_URL, or any VITE_* secret.
+ */
+export function readUpstashCredentials(env: NodeJS.Dict<string>): UpstashCredentials | null {
+  const upstashUrl = envText(env, 'UPSTASH_REDIS_REST_URL');
+  const upstashToken = envText(env, 'UPSTASH_REDIS_REST_TOKEN');
+  if (upstashUrl && upstashToken) {
+    return {
+      url: upstashUrl,
+      token: upstashToken,
+      source: 'upstash',
+      urlEnv: 'UPSTASH_REDIS_REST_URL',
+      tokenEnv: 'UPSTASH_REDIS_REST_TOKEN',
+    };
+  }
+
+  const kvUrl = envText(env, 'KV_REST_API_URL');
+  const kvToken = envText(env, 'KV_REST_API_TOKEN');
+  if (kvUrl && kvToken) {
+    return {
+      url: kvUrl,
+      token: kvToken,
+      source: 'vercel-kv',
+      urlEnv: 'KV_REST_API_URL',
+      tokenEnv: 'KV_REST_API_TOKEN',
+    };
+  }
+
+  return null;
+}
+
+let loggedCredentialSource = false;
+
+export function resetUpstashCredentialLog(): void {
+  loggedCredentialSource = false;
+}
+
+function logSelectedCredentials(credentials: UpstashCredentials): void {
+  if (loggedCredentialSource) return;
+  loggedCredentialSource = true;
+  console.info(`[MoginHood] burn store redis: ${credentials.urlEnv} / ${credentials.tokenEnv}`);
 }
 
 export async function executeUpstashCommand(
@@ -157,5 +210,6 @@ export function createUpstashVerifiedBurnStore(
 ): UpstashVerifiedBurnStore | null {
   const credentials = readUpstashCredentials(env);
   if (!credentials) return null;
+  logSelectedCredentials(credentials);
   return new UpstashVerifiedBurnStore((command) => executeUpstashCommand(credentials, command, fetchImpl));
 }
