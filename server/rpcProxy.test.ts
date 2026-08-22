@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { handleJsonRpcProxy, isRpcMethodAllowed, rpcProxyFromRequest, sanitizeRpcLogText } from './rpcProxy';
+import { handleJsonRpcProxy, isRpcMethodAllowed, rpcProxyFromRequest, sanitizeRpcLogText } from './rpcProxy.js';
 
 const UPSTREAM = 'https://mainnet.helius-rpc.com/?api-key=super-secret-test-key';
 

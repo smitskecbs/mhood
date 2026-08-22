@@ -1,4 +1,4 @@
-import { handleJsonRpcProxy, jsonRpcHttpResponse, rpcProxyFromRequest } from '../server/rpcProxy';
+import { handleJsonRpcProxy, jsonRpcHttpResponse, rpcProxyFromRequest } from '../server/rpcProxy.js';
 
 export const config = {
   runtime: 'nodejs',

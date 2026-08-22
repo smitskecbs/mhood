@@ -3,8 +3,8 @@ import {
   collectBurnCheckedInstructions,
   confirmAndVerifyBurn,
   upsertVerifiedBurn,
-} from '../src/services/burnVerification';
-import type { BurnRecord } from '../src/types';
+} from '../src/services/burnVerification.js';
+import type { BurnRecord } from '../src/types/index.js';
 
 export const VERIFIED_BURNS_MINT = 'EiuaNV7T3Uz7yoVxkgxZQGXENreyBUqDWnfBLjbsYVVs';
 export const VERIFIED_BURNS_DECIMALS = 6;

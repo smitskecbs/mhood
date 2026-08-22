@@ -2,10 +2,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { loadEnv, type Plugin } from 'vite';
-import type { BurnRecord } from '../src/types';
-import { readJsonBody, sendJson } from './httpJson';
-import { handleJsonRpcProxy } from './rpcProxy';
-import { handleVerifiedBurnsRequest } from './verifiedBurnsApi';
+import type { BurnRecord } from '../src/types/index.js';
+import { readJsonBody, sendJson } from './httpJson.js';
+import { handleJsonRpcProxy } from './rpcProxy.js';
+import { handleVerifiedBurnsRequest } from './verifiedBurnsApi.js';
 
 const STORE_FILE = 'data/verified-burns.json';
 

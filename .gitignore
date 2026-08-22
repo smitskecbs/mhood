@@ -1,4 +1,6 @@
 node_modules
+.vercel
+.vercel-esm-check
 dist
 dist-ssr
 *.local

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { handleVerifiedBurnsRequest, verifiedBurnsGetBody } from './verifiedBurnsApi';
+import { handleVerifiedBurnsRequest, verifiedBurnsGetBody } from './verifiedBurnsApi.js';
 
 describe('verified burns API persistence', () => {
   it('returns empty records when production persistence is inactive', async () => {

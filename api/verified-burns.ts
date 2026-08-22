@@ -1,4 +1,4 @@
-import { handleVerifiedBurnsRequest } from '../server/verifiedBurnsApi';
+import { handleVerifiedBurnsRequest } from '../server/verifiedBurnsApi.js';
 
 export const config = {
   runtime: 'nodejs',

@@ -6,9 +6,9 @@ import {
 } from '@solana/spl-token';
 import { PublicKey, TransactionInstruction, type Connection } from '@solana/web3.js';
 import { Buffer } from 'buffer';
-import { SPL_TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID as TOKEN_2022_ID } from '../types';
-import { formatTokenAmount } from '../utils/tokenAmount';
-import type { BurnRecord } from '../types';
+import { SPL_TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID as TOKEN_2022_ID } from '../types/index.js';
+import { formatTokenAmount } from '../utils/tokenAmount.js';
+import type { BurnRecord } from '../types/index.js';
 
 export type BurnVerificationExpectation = {
   mint: string;
