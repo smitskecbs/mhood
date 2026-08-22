@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { findBurnRank, findWalletBurnedRaw } from '../../services/burnRankingService';
+import { findBurnRank, findWalletBurnCount, findWalletBurnedRaw } from '../../services/burnRankingService';
 import { presentHolderRanking, findCommunityWalletRank } from '../../utils/holderPresentation';
 import type { BurnRankingSnapshot, HolderRankingSnapshot, MintDetails, WalletMhoodBalance } from '../../types';
 import { BurnPanel } from '../BurnPanel/BurnPanel';
@@ -59,13 +59,15 @@ export function ForestDashboard({
           holderRank={findCommunityWalletRank(presentation, balance.wallet)}
           holderLoading={holderLoading}
           burnedRaw={findWalletBurnedRaw(burnSnapshot, balance.wallet)}
+          burns={findWalletBurnCount(burnSnapshot, balance.wallet)}
           burnRank={findBurnRank(burnSnapshot, balance.wallet)}
           rankingLive={Boolean(holderSnapshot?.live)}
+          burnHistoryLive={Boolean(burnSnapshot && burnSnapshot.persistence !== 'inactive')}
         />
       </div>
 
       <div className="forest-stage forest-stage--stats">
-        <StatsCards mint={mint} snapshot={burnSnapshot} wallet={balance.wallet} />
+        <StatsCards mint={mint} snapshot={burnSnapshot} />
       </div>
 
       <div className="forest-stage forest-stage--holders">

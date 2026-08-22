@@ -33,6 +33,8 @@ export const COPY = {
   noBurns: 'No verified forest burns yet.',
   legendsPersistenceInactive:
     'Persistent production burn history is not active yet. On-chain burns can still complete; Forest Legends will list them once a ledger is configured.',
+  legendsIndexedIncomplete:
+    'Forest Legends shows verified indexed burns. Global Total Burned comes from on-chain supply.',
   yourPosition: 'Your position',
   burnTitle: 'THE BURNING GROVE',
   burnPrompt: 'Choose what you are willing to return to the forest.',

@@ -10,8 +10,10 @@ type WalletSummaryProps = {
   holderRank: number | null;
   holderLoading: boolean;
   burnedRaw: bigint;
+  burns: number;
   burnRank: number | null;
   rankingLive: boolean;
+  burnHistoryLive: boolean;
 };
 
 function RankValue({
@@ -37,8 +39,10 @@ export function WalletSummary({
   holderRank,
   holderLoading,
   burnedRaw,
+  burns,
   burnRank,
   rankingLive,
+  burnHistoryLive,
 }: WalletSummaryProps) {
   const { disconnect } = useWallet();
 
@@ -61,12 +65,18 @@ export function WalletSummary({
         </div>
         <div>
           <p className="stat-label">Burned</p>
-          <p className="stat-value">{formatTokenAmount(burnedRaw, mint.decimals)} MHOOD</p>
+          <p className="stat-value">
+            {burnHistoryLive ? `${formatTokenAmount(burnedRaw, mint.decimals)} MHOOD` : '—'}
+          </p>
+        </div>
+        <div>
+          <p className="stat-label">Burns</p>
+          <p className="stat-value">{burnHistoryLive ? burns : '—'}</p>
         </div>
         <div>
           <p className="stat-label">Burn Rank</p>
           <p className="stat-value">
-            <RankValue rank={burnRank} live={false} />
+            <RankValue rank={burnHistoryLive ? burnRank : null} live={false} />
           </p>
         </div>
       </div>

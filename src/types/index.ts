@@ -47,7 +47,7 @@ export type HolderTier = 'wanderer' | 'keeper' | 'elder' | 'legend';
 
 export type RankingSourceKind = 'mock' | 'indexer' | 'rpc' | 'none' | 'local';
 
-export type BurnPersistenceMode = 'local' | 'inactive';
+export type BurnPersistenceMode = 'local' | 'inactive' | 'persistent';
 
 export type HolderRankingSnapshot = {
   entries: HolderRankingEntry[];

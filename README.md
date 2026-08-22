@@ -176,7 +176,21 @@ Forest Legends toont alleen **on-chain geverifieerde** `BurnRecord`s:
 
 De lokale demo bewaart verified signatures via `GET/POST /api/verified-burns` (Vite-dev middleware, bestand `data/verified-burns.json`). De browser is geen source of truth: POST stuurt alleen een signature, de server haalt de transactie op en controleert BurnChecked (mint, authority, amount) voordat een record wordt toegevoegd. Dubbele signatures worden genegeerd.
 
-Productie heeft later een echte backend/database nodig. `localStorage` wordt niet gebruikt voor Forest Legends.
+Productie gebruikt **Upstash Redis** (Vercel Marketplace; Vercel KV is deprecated). Zet server-only:
+
+```env
+UPSTASH_REDIS_REST_URL=
+UPSTASH_REDIS_REST_TOKEN=
+BURN_BACKFILL_SECRET=
+```
+
+Daarna bestaande burns één keer importeren:
+
+```bash
+BURN_BACKFILL_SECRET=... BACKFILL_URL=https://mhood.cbs-coin.com npm run backfill:burns
+```
+
+`localStorage` wordt niet gebruikt voor Forest Legends. Global **Total Burned** blijft `original supply - current supply`. Forest Legends / per-wallet stats komen alleen uit geverifieerde indexed records.
 
 Geen fake burn-records in de gewone UI. Simulation-burns (`VITE_ENABLE_REAL_BURN=false`) gaan niet naar de ranking.
 
@@ -221,8 +235,5 @@ Echte burn later aanzetten:
 
 - RPC/API keys achter een backend/proxy zetten; nooit als `VITE_` secret behandelen.
 - Holder ranking server-side cachen.
-- Burn-indexer aansluiten op echte `BurnChecked` transacties.
-- Optionele backend access-check als er ooit niet-publieke forest-content komt.
-- `VITE_ENABLE_REAL_BURN` bewust beslissen; default moet false blijven tot de flow op een testmint is geverifieerd.
 - Error monitoring, rate-limit handling, en een productie-`.env` zonder secrets in git.
 - Eventueel een custom domain en HTTPS deploy, pas ná lokale goedkeuring.

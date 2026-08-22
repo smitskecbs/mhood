@@ -1,39 +1,21 @@
-import fs from 'node:fs';
-import path from 'node:path';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { loadEnv, type Plugin } from 'vite';
-import type { BurnRecord } from '../src/types/index.js';
 import { readJsonBody, sendJson } from './httpJson.js';
 import { handleJsonRpcProxy } from './rpcProxy.js';
-import { handleVerifiedBurnsRequest } from './verifiedBurnsApi.js';
+import { handleVerifiedBurnsRequest, authorizeBackfillRequest } from './verifiedBurnsApi.js';
+import { createVerifiedBurnStore } from './createVerifiedBurnStore.js';
+import { backfillVerifiedBurns } from './backfillVerifiedBurns.js';
 
-const STORE_FILE = 'data/verified-burns.json';
-
-type StoreFile = { records: BurnRecord[] };
-
-function storePath(root: string): string {
-  return path.join(root, STORE_FILE);
+function mergedEnv(root: string, mode: string): NodeJS.Dict<string> {
+  return { ...process.env, ...loadEnv(mode, root, '') };
 }
 
-function readStore(root: string): BurnRecord[] {
-  try {
-    const raw = fs.readFileSync(storePath(root), 'utf8');
-    const parsed = JSON.parse(raw) as StoreFile;
-    return Array.isArray(parsed.records) ? parsed.records : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeStore(root: string, records: BurnRecord[]): void {
-  const file = storePath(root);
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, `${JSON.stringify({ records }, null, 2)}\n`, 'utf8');
-}
-
-function serverRpcUrl(root: string, mode: string): string {
-  const env = loadEnv(mode, root, '');
-  return (env.HELIUS_RPC_URL || env.VITE_SOLANA_RPC_URL || '').trim();
+function upstreamRpcUrl(env: NodeJS.Dict<string>): string {
+  const helius = (env.HELIUS_RPC_URL || '').trim();
+  if (helius) return helius;
+  const vite = (env.VITE_SOLANA_RPC_URL || '').trim();
+  if (vite && !vite.startsWith('/')) return vite;
+  return '';
 }
 
 export function moginhoodApiPlugin(): Plugin {
@@ -44,9 +26,10 @@ export function moginhoodApiPlugin(): Plugin {
         const url = req.url?.split('?')[0];
         const root = server.config.root;
         const mode = server.config.mode;
+        const env = mergedEnv(root, mode);
 
         if (url === '/api/rpc') {
-          void handleRpc(req, res, root, mode).catch((err: unknown) => {
+          void handleRpc(req, res, env).catch((err: unknown) => {
             const message = err instanceof Error ? err.message : 'Invalid JSON-RPC request.';
             sendJson(res, 400, { error: message });
           });
@@ -54,8 +37,16 @@ export function moginhoodApiPlugin(): Plugin {
         }
 
         if (url === '/api/verified-burns') {
-          void handleBurns(req, res, root, mode).catch((err: unknown) => {
+          void handleBurns(req, res, root, env).catch((err: unknown) => {
             const message = err instanceof Error ? err.message : 'The forest could not confirm the burn.';
+            sendJson(res, 500, { error: message });
+          });
+          return;
+        }
+
+        if (url === '/api/admin/backfill-burns') {
+          void handleBackfill(req, res, root, env).catch((err: unknown) => {
+            const message = err instanceof Error ? err.message : 'Backfill failed.';
             sendJson(res, 500, { error: message });
           });
           return;
@@ -70,14 +61,13 @@ export function moginhoodApiPlugin(): Plugin {
 async function handleRpc(
   req: IncomingMessage,
   res: ServerResponse,
-  root: string,
-  mode: string,
+  env: NodeJS.Dict<string>,
 ): Promise<void> {
   const body = req.method === 'POST' ? await readJsonBody(req) : null;
   const result = await handleJsonRpcProxy({
     httpMethod: req.method ?? 'GET',
     body,
-    upstreamUrl: serverRpcUrl(root, mode),
+    upstreamUrl: upstreamRpcUrl(env) || undefined,
   });
   sendJson(res, result.status, result.body);
 }
@@ -86,22 +76,48 @@ async function handleBurns(
   req: IncomingMessage,
   res: ServerResponse,
   root: string,
-  mode: string,
+  env: NodeJS.Dict<string>,
 ): Promise<void> {
   const body = req.method === 'POST' ? await readJsonBody(req) : null;
   const result = await handleVerifiedBurnsRequest({
     httpMethod: req.method ?? 'GET',
     body,
-    persistence: 'local',
-    records: readStore(root),
-    rpcUrl: serverRpcUrl(root, mode),
-    persist: (record) => {
-      const next = [...readStore(root).filter((item) => item.signature !== record.signature), record];
-      writeStore(root, next);
-      return next;
-    },
+    rpcUrl: upstreamRpcUrl(env),
+    store: createVerifiedBurnStore(env, { fileRoot: root }),
   });
   sendJson(res, result.status, result.body);
+}
+
+async function handleBackfill(
+  req: IncomingMessage,
+  res: ServerResponse,
+  root: string,
+  env: NodeJS.Dict<string>,
+): Promise<void> {
+  if (req.method !== 'POST') {
+    sendJson(res, 404, { error: 'Not found' });
+    return;
+  }
+  if (!authorizeBackfillRequest(req, (env.BURN_BACKFILL_SECRET || '').trim())) {
+    sendJson(res, 404, { error: 'Not found' });
+    return;
+  }
+  const rpcUrl = upstreamRpcUrl(env);
+  if (!rpcUrl || rpcUrl.startsWith('/')) {
+    sendJson(res, 503, { error: 'Solana RPC endpoint is not configured.' });
+    return;
+  }
+  const store = createVerifiedBurnStore(env, { fileRoot: root });
+  const result = await backfillVerifiedBurns({ rpcUrl, store });
+  sendJson(res, 200, {
+    ok: true,
+    persistence: store.persistence,
+    scanned: result.scanned,
+    imported: result.imported.length,
+    duplicates: result.duplicates.length,
+    rejected: result.rejected.length,
+    records: result.imported,
+  });
 }
 
 /** @deprecated Use moginhoodApiPlugin — kept as a stable Vite config name. */

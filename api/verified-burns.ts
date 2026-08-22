@@ -1,9 +1,10 @@
+import { createVerifiedBurnStore } from '../server/createVerifiedBurnStore.js';
+import { handleVerifiedBurnsRequest } from '../server/verifiedBurnsApi.js';
+
 export const config = {
   runtime: 'nodejs',
   maxDuration: 30,
 };
-
-const INACTIVE_GET_BODY = { records: [] as const, persistence: 'inactive' as const };
 
 function isWebRequest(value: unknown): value is Request {
   return Boolean(
@@ -20,9 +21,18 @@ type NodeResponse = {
   end: (chunk?: string) => void;
 };
 
+function storeFromEnv() {
+  return createVerifiedBurnStore(process.env);
+}
+
 export async function GET(): Promise<Response> {
-  console.info('[MoginHood] burn persistence: inactive');
-  return Response.json(INACTIVE_GET_BODY);
+  const result = await handleVerifiedBurnsRequest({
+    httpMethod: 'GET',
+    body: null,
+    rpcUrl: process.env.HELIUS_RPC_URL ?? '',
+    store: storeFromEnv(),
+  });
+  return Response.json(result.body, { status: result.status });
 }
 
 export async function POST(request: Request): Promise<Response> {
@@ -36,17 +46,14 @@ export async function POST(request: Request): Promise<Response> {
         { status: 400 },
       );
     }
-    const { handleVerifiedBurnsRequest } = await import('../server/verifiedBurnsApi.js');
     const result = await handleVerifiedBurnsRequest({
       httpMethod: 'POST',
       body,
-      persistence: 'inactive',
-      records: [],
       rpcUrl: process.env.HELIUS_RPC_URL ?? '',
+      store: storeFromEnv(),
     });
     return Response.json(result.body, { status: result.status });
   } catch (err) {
-    console.info('[MoginHood] burn persistence: inactive');
     const message = err instanceof Error ? err.message : 'Burn verification is temporarily unavailable.';
     return Response.json(
       { verified: false, persistence: 'inactive', error: message },
@@ -64,37 +71,15 @@ export default async function handler(
     return method === 'POST' ? POST(request) : GET();
   }
   if (response && typeof response.end === 'function') {
-    if (method !== 'POST') {
-      console.info('[MoginHood] burn persistence: inactive');
-      response.statusCode = 200;
-      response.setHeader('Content-Type', 'application/json');
-      response.end(JSON.stringify(INACTIVE_GET_BODY));
-      return;
-    }
-    try {
-      const { handleVerifiedBurnsRequest } = await import('../server/verifiedBurnsApi.js');
-      const result = await handleVerifiedBurnsRequest({
-        httpMethod: 'POST',
-        body: request.body ?? null,
-        persistence: 'inactive',
-        records: [],
-        rpcUrl: process.env.HELIUS_RPC_URL ?? '',
-      });
-      response.statusCode = result.status;
-      response.setHeader('Content-Type', 'application/json');
-      response.end(JSON.stringify(result.body));
-    } catch (err) {
-      console.info('[MoginHood] burn persistence: inactive');
-      response.statusCode = 200;
-      response.setHeader('Content-Type', 'application/json');
-      response.end(
-        JSON.stringify({
-          verified: false,
-          persistence: 'inactive',
-          error: err instanceof Error ? err.message : 'Burn verification is temporarily unavailable.',
-        }),
-      );
-    }
+    const result = await handleVerifiedBurnsRequest({
+      httpMethod: method === 'POST' ? 'POST' : 'GET',
+      body: method === 'POST' ? (request.body ?? null) : null,
+      rpcUrl: process.env.HELIUS_RPC_URL ?? '',
+      store: storeFromEnv(),
+    });
+    response.statusCode = result.status;
+    response.setHeader('Content-Type', 'application/json');
+    response.end(JSON.stringify(result.body));
     return;
   }
   return GET();

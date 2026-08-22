@@ -9,7 +9,7 @@ describe('real burn architecture', () => {
     expect(burnService).toMatch(/sendTransaction/);
     expect(burnService).not.toMatch(/Keypair\.fromSecretKey/);
     expect(burnService).not.toMatch(/HELIUS_RPC_URL/);
-    expect(vercelBurns).toMatch(/persistence: 'inactive'/);
+    expect(vercelBurns).toMatch(/createVerifiedBurnStore/);
     expect(vercelBurns).not.toMatch(/writeFileSync/);
     expect(vercelBurns).not.toMatch(/fromSecretKey/);
   });

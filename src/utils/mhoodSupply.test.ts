@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MHOOD_ORIGINAL_SUPPLY_RAW } from '../config/constants';
 import { formatTokenAmount } from './tokenAmount';
-import { originalMhoodSupplyRaw, totalBurnedFromSupply } from './mhoodSupply';
+import { originalMhoodSupplyRaw, totalBurnedFromSupply, indexedBurnGapMessage } from './mhoodSupply';
 
 describe('on-chain MHOOD supply tracking', () => {
   it('uses 1,000,000,000 MHOOD at 6 decimals as the original raw supply', () => {
@@ -21,7 +21,14 @@ describe('on-chain MHOOD supply tracking', () => {
     const burned = totalBurnedFromSupply(current);
     expect(burned).toBe(2_000_000n);
     expect(formatTokenAmount(burned, 6)).toBe('2');
-    expect(originalMhoodSupplyRaw() - current).toBe(burned);
+    expect(MHOOD_ORIGINAL_SUPPLY_RAW - current).toBe(burned);
+  });
+
+  it('describes indexed history that is behind on-chain supply', () => {
+    expect(indexedBurnGapMessage(2_000_000n, 1_000_000n, 6)).toBe(
+      '2 MHOOD burned on-chain · 1 MHOOD indexed',
+    );
+    expect(indexedBurnGapMessage(2_000_000n, 2_000_000n, 6)).toBeNull();
   });
 
   it('keeps burned supply math in bigint, never Number', () => {

@@ -1,15 +1,14 @@
-import { Connection } from '@solana/web3.js';
 import {
-  collectBurnCheckedInstructions,
-  confirmAndVerifyBurn,
   upsertVerifiedBurn,
 } from '../src/services/burnVerification.js';
 import type { BurnRecord } from '../src/types/index.js';
+import type { BurnPersistenceMode } from '../src/types/index.js';
+import type { VerifiedBurnStore } from './verifiedBurnStore.js';
+import { InactiveVerifiedBurnStore } from './verifiedBurnStore.js';
+import { verifyOnChainMhoodBurn } from './verifyOnChainBurn.js';
 
 export const VERIFIED_BURNS_MINT = 'EiuaNV7T3Uz7yoVxkgxZQGXENreyBUqDWnfBLjbsYVVs';
 export const VERIFIED_BURNS_DECIMALS = 6;
-
-export type BurnPersistenceMode = 'local' | 'inactive';
 
 export type VerifiedBurnsGetBody = {
   records: BurnRecord[];
@@ -34,6 +33,9 @@ export async function verifyBurnSignature(input: {
   signature: string;
   rpcUrl: string;
   existing: BurnRecord[];
+  expectedWallet?: string;
+  fetchImpl?: typeof fetch;
+  verify?: typeof verifyOnChainMhoodBurn;
 }): Promise<{ record: BurnRecord; added: boolean }> {
   const duplicate = input.existing.find((record) => record.signature === input.signature);
   if (duplicate) {
@@ -42,31 +44,13 @@ export async function verifyBurnSignature(input: {
   }
 
   serverBurnLog(`verifying burn: ${input.signature}`);
-  const connection = new Connection(input.rpcUrl, 'confirmed');
-  const parsedTx = await connection.getParsedTransaction(input.signature, {
-    commitment: 'confirmed',
-    maxSupportedTransactionVersion: 0,
+  const verify = input.verify ?? verifyOnChainMhoodBurn;
+  const record = await verify({
+    signature: input.signature,
+    rpcUrl: input.rpcUrl,
+    expectedWallet: input.expectedWallet,
+    fetchImpl: input.fetchImpl,
   });
-  if (!parsedTx) {
-    throw new Error('The forest could not confirm the burn.');
-  }
-
-  const burns = collectBurnCheckedInstructions({
-    transaction: parsedTx.transaction,
-    meta: parsedTx.meta,
-  });
-  if (burns.length === 0) {
-    throw new Error('Transaction does not contain a MHOOD BurnChecked instruction.');
-  }
-  const amountRaw = burns.reduce((total, burn) => total + burn.amountRaw, 0n);
-  const wallet = burns[0]?.wallet ?? '';
-
-  const record = await confirmAndVerifyBurn(
-    connection,
-    input.signature,
-    { mint: VERIFIED_BURNS_MINT, wallet, amountRaw },
-    VERIFIED_BURNS_DECIMALS,
-  );
   serverBurnLog('verification success');
   const next = upsertVerifiedBurn(input.existing, record);
   return { record, added: next.added };
@@ -75,22 +59,26 @@ export async function verifyBurnSignature(input: {
 export async function handleVerifiedBurnsRequest(input: {
   httpMethod: string;
   body: unknown;
-  persistence: BurnPersistenceMode;
-  records: BurnRecord[];
   rpcUrl: string;
+  store?: VerifiedBurnStore;
+  persistence?: BurnPersistenceMode;
+  records?: BurnRecord[];
   persist?: (record: BurnRecord) => BurnRecord[];
   verify?: typeof verifyBurnSignature;
 }): Promise<{ status: number; body: unknown }> {
+  const store = input.store ?? new InactiveVerifiedBurnStore();
   try {
     if (input.httpMethod === 'GET') {
-      if (input.persistence === 'inactive') {
+      const records = input.records ?? (await store.list());
+      const persistence = input.persistence ?? store.persistence;
+      if (persistence === 'inactive') {
         serverBurnLog('burn persistence: inactive');
       }
-      return { status: 200, body: verifiedBurnsGetBody(input.records, input.persistence) };
+      return { status: 200, body: verifiedBurnsGetBody(records, persistence) };
     }
 
     if (input.httpMethod !== 'POST') {
-      return { status: 405, body: { error: 'Method not allowed', persistence: input.persistence } };
+      return { status: 405, body: { error: 'Method not allowed', persistence: store.persistence } };
     }
 
     const signature =
@@ -103,7 +91,7 @@ export async function handleVerifiedBurnsRequest(input: {
       serverBurnLog('verification failed: missing signature');
       return {
         status: 400,
-        body: { verified: false, persistence: input.persistence, error: 'Missing transaction signature.' },
+        body: { verified: false, persistence: store.persistence, error: 'Missing transaction signature.' },
       };
     }
 
@@ -120,12 +108,18 @@ export async function handleVerifiedBurnsRequest(input: {
     }
 
     const verify = input.verify ?? verifyBurnSignature;
-    const existing = input.persistence === 'inactive' ? [] : input.records;
+    const existing = store.persistence === 'inactive' ? (input.records ?? []) : await store.list();
     const result = await verify({ signature, rpcUrl: input.rpcUrl, existing });
-    if (input.persistence === 'local' && input.persist && result.added) {
+    let added = result.added;
+    if (store.persistence !== 'inactive') {
+      const saved = await store.add(result.record);
+      added = saved.added;
+      if (saved.added) serverBurnLog('record stored');
+      else serverBurnLog(`duplicate signature ignored: ${signature}`);
+    } else if (input.persistence === 'local' && input.persist && result.added) {
       input.persist(result.record);
       serverBurnLog('record stored');
-    } else if (input.persistence === 'inactive') {
+    } else if (store.persistence === 'inactive') {
       serverBurnLog('burn persistence: inactive');
     }
     return {
@@ -133,8 +127,8 @@ export async function handleVerifiedBurnsRequest(input: {
       body: {
         verified: true,
         record: result.record,
-        persistence: input.persistence,
-        added: Boolean(result.added && input.persistence === 'local'),
+        persistence: store.persistence,
+        added: Boolean(added && store.persistence !== 'inactive'),
       },
     };
   } catch (err) {
@@ -146,7 +140,29 @@ export async function handleVerifiedBurnsRequest(input: {
     serverBurnLog(`verification failed: ${message}`);
     return {
       status: 400,
-      body: { verified: false, persistence: input.persistence, error: message },
+      body: { verified: false, persistence: store.persistence, error: message },
     };
   }
+}
+
+export function backfillSecretFromEnv(env: NodeJS.Dict<string> = process.env): string {
+  return (env.BURN_BACKFILL_SECRET || '').trim();
+}
+
+export function authorizeBackfillRequest(
+  request: { headers?: Headers | Record<string, string | string[] | undefined> },
+  secret = backfillSecretFromEnv(),
+): boolean {
+  if (!secret) return false;
+  const headers = request.headers;
+  let authorization = '';
+  if (headers && typeof (headers as Headers).get === 'function') {
+    authorization = (headers as Headers).get('authorization') ?? '';
+  } else if (headers && typeof headers === 'object') {
+    const raw = (headers as Record<string, string | string[] | undefined>).authorization
+      ?? (headers as Record<string, string | string[] | undefined>).Authorization;
+    authorization = Array.isArray(raw) ? raw[0] ?? '' : raw ?? '';
+  }
+  const expected = `Bearer ${secret}`;
+  return authorization === expected;
 }

@@ -240,6 +240,58 @@ export function collectBurnCheckedInstructions(payload: {
   return found;
 }
 
+export function extractVerifiedMhoodBurnRecord(input: {
+  signature: string;
+  parsed: {
+    slot: number;
+    blockTime?: number | null;
+    transaction?: { message?: { instructions?: readonly unknown[] } };
+    meta?: {
+      err?: unknown;
+      innerInstructions?: readonly { instructions?: readonly unknown[] }[] | null;
+    } | null;
+  };
+  mint: string;
+  decimals: number;
+  expectedWallet?: string;
+}): BurnRecord {
+  if (input.parsed.meta?.err) {
+    throw new BurnVerificationError('The burn transaction failed on-chain.');
+  }
+
+  const burns = collectBurnCheckedInstructions({
+    transaction: input.parsed.transaction,
+    meta: input.parsed.meta,
+  });
+  const mhoodBurns = burns.filter((burn) => burn.mint === input.mint);
+  if (mhoodBurns.length === 0) {
+    if (burns.length > 0) {
+      throw new BurnVerificationError('BurnChecked mint does not match MHOOD.');
+    }
+    throw new BurnVerificationError('Transaction does not contain a MHOOD BurnChecked instruction.');
+  }
+
+  const wallets = new Set(mhoodBurns.map((burn) => burn.wallet));
+  const wallet = mhoodBurns[0]?.wallet ?? '';
+  if (!wallet || wallets.size !== 1) {
+    throw new BurnVerificationError('BurnChecked authority does not match the connected wallet.');
+  }
+  if (input.expectedWallet && wallet !== input.expectedWallet) {
+    throw new BurnVerificationError('BurnChecked authority does not match the connected wallet.');
+  }
+
+  const amountRaw = mhoodBurns.reduce((total, burn) => total + burn.amountRaw, 0n);
+  return toBurnRecord({
+    signature: input.signature,
+    wallet,
+    mint: input.mint,
+    amountRaw,
+    decimals: input.decimals,
+    slot: input.parsed.slot,
+    timestamp: input.parsed.blockTime ?? null,
+  });
+}
+
 export function verifyExtractedBurns(
   burns: ExtractedBurnChecked[],
   expected: BurnVerificationExpectation,
@@ -313,24 +365,17 @@ export async function confirmAndVerifyBurn(
   decimals: number,
 ): Promise<BurnRecord> {
   const parsed = await fetchParsedTransaction(connection, signature);
-  if (parsed.meta?.err) {
-    throw new BurnVerificationError('The burn transaction failed on-chain.');
-  }
-
-  const burns = collectBurnCheckedInstructions({
-    transaction: parsed.transaction,
-    meta: parsed.meta,
-  });
-  const verified = verifyExtractedBurns(burns, expected);
-  return toBurnRecord({
+  const record = extractVerifiedMhoodBurnRecord({
     signature,
-    wallet: verified.wallet,
-    mint: verified.mint,
-    amountRaw: verified.amountRaw,
+    parsed,
+    mint: expected.mint,
     decimals,
-    slot: parsed.slot,
-    timestamp: parsed.blockTime ?? null,
+    expectedWallet: expected.wallet,
   });
+  if (BigInt(record.amountRaw) !== expected.amountRaw) {
+    throw new BurnVerificationError('Verified burn amount does not match the prepared amount.');
+  }
+  return record;
 }
 
 export function upsertVerifiedBurn(

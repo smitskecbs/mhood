@@ -40,6 +40,9 @@ export class LocalVerifiedBurnsProvider implements BurnRankingProvider {
     if (ledger.persistence === 'inactive') {
       this.live = false;
       this.disclaimer = COPY.legendsPersistenceInactive;
+    } else if (ledger.persistence === 'persistent') {
+      this.live = true;
+      this.disclaimer = COPY.legendsIndexedIncomplete;
     }
     return ledger.records.map((record) => ({
       ...record,
@@ -136,13 +139,16 @@ export class BurnRankingService {
   async getRanking(decimals: number): Promise<BurnRankingSnapshot> {
     const records = await this.provider.fetchRecords(decimals);
     const snapshot = aggregateBurnRecords(records, decimals);
-    if (this.provider instanceof LocalVerifiedBurnsProvider && this.provider.persistence === 'inactive') {
+    if (this.provider instanceof LocalVerifiedBurnsProvider) {
       return {
         ...snapshot,
-        persistence: 'inactive',
-        live: false,
-        source: 'none',
-        disclaimer: COPY.legendsPersistenceInactive,
+        persistence: this.provider.persistence,
+        live: this.provider.persistence !== 'inactive' && snapshot.live,
+        source: this.provider.persistence === 'inactive' ? 'none' : snapshot.source,
+        disclaimer:
+          this.provider.persistence === 'inactive'
+            ? COPY.legendsPersistenceInactive
+            : snapshot.disclaimer,
       };
     }
     return snapshot;
@@ -168,4 +174,12 @@ export function findWalletBurnedRaw(
   if (!snapshot || !wallet) return 0n;
   const match = snapshot.entries.find((entry) => entry.wallet === wallet);
   return match ? BigInt(match.totalBurnedRaw) : 0n;
+}
+
+export function findWalletBurnCount(
+  snapshot: BurnRankingSnapshot | null,
+  wallet: string | null,
+): number {
+  if (!snapshot || !wallet) return 0;
+  return snapshot.entries.find((entry) => entry.wallet === wallet)?.burns ?? 0;
 }

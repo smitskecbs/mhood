@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import {
   collectBurnCheckedInstructions,
+  extractVerifiedMhoodBurnRecord,
   upsertVerifiedBurn,
   verifyExtractedBurns,
   BurnVerificationError,
@@ -108,5 +109,45 @@ describe('burn verification', () => {
     expect(first.added).toBe(true);
     expect(second.added).toBe(false);
     expect(second.records).toHaveLength(1);
+  });
+
+  it('accepts a valid MHOOD BurnChecked transaction as a record', () => {
+    const record = extractVerifiedMhoodBurnRecord({
+      signature: '3zHkRrfU9VBq6PT7xwGgzYmcMnftq838ncwoSoTJuwJwKzpNbLFEnG4D23hSi3koNaFDFR942DoRzsGNCxUgEzsH',
+      parsed: { slot: 440947761, blockTime: 1787411161, ...parsedBurn('1000000') },
+      mint,
+      decimals: 6,
+      expectedWallet: wallet,
+    });
+    expect(record.signature).toBe(
+      '3zHkRrfU9VBq6PT7xwGgzYmcMnftq838ncwoSoTJuwJwKzpNbLFEnG4D23hSi3koNaFDFR942DoRzsGNCxUgEzsH',
+    );
+    expect(record.wallet).toBe(wallet);
+    expect(record.mint).toBe(mint);
+    expect(record.amountRaw).toBe('1000000');
+    expect(record.amountUi).toBe('1');
+  });
+
+  it('rejects a BurnChecked for the wrong mint', () => {
+    expect(() =>
+      extractVerifiedMhoodBurnRecord({
+        signature: 'sig-wrong-mint',
+        parsed: { slot: 1, blockTime: 1, ...parsedBurn('1000000') },
+        mint: 'So11111111111111111111111111111111111111112',
+        decimals: 6,
+      }),
+    ).toThrow(/mint/);
+  });
+
+  it('rejects a BurnChecked from the wrong authority', () => {
+    expect(() =>
+      extractVerifiedMhoodBurnRecord({
+        signature: 'sig-wrong-auth',
+        parsed: { slot: 1, blockTime: 1, ...parsedBurn('1000000') },
+        mint,
+        decimals: 6,
+        expectedWallet: 'Other1111111111111111111111111111111111111',
+      }),
+    ).toThrow(/authority/);
   });
 });

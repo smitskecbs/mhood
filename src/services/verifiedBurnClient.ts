@@ -10,7 +10,8 @@ export type VerifiedBurnSubmitResult = {
 };
 
 function persistenceMode(value: unknown, fallback: BurnPersistenceMode): BurnPersistenceMode {
-  return value === 'inactive' ? 'inactive' : fallback;
+  if (value === 'inactive' || value === 'local' || value === 'persistent') return value;
+  return fallback;
 }
 
 export async function fetchVerifiedBurnLedger(): Promise<{

@@ -1,0 +1,49 @@
+import { extractVerifiedMhoodBurnRecord } from '../src/services/burnVerification.js';
+import type { BurnRecord } from '../src/types/index.js';
+import { MHOOD_BURN_DECIMALS, MHOOD_BURN_MINT } from './knownMhoodBurns.js';
+import { solanaJsonRpc } from './solanaJsonRpc.js';
+
+export type ParsedBurnTransaction = {
+  slot: number;
+  blockTime?: number | null;
+  transaction?: { message?: { instructions?: readonly unknown[] } };
+  meta?: {
+    err?: unknown;
+    innerInstructions?: readonly { instructions?: readonly unknown[] }[] | null;
+  } | null;
+};
+
+export async function fetchParsedBurnTransaction(
+  rpcUrl: string,
+  signature: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<ParsedBurnTransaction | null> {
+  return solanaJsonRpc<ParsedBurnTransaction | null>(
+    rpcUrl,
+    'getTransaction',
+    [signature, { encoding: 'jsonParsed', maxSupportedTransactionVersion: 0, commitment: 'confirmed' }],
+    fetchImpl,
+  );
+}
+
+export async function verifyOnChainMhoodBurn(input: {
+  signature: string;
+  rpcUrl: string;
+  expectedWallet?: string;
+  fetchImpl?: typeof fetch;
+  fetchTransaction?: (signature: string) => Promise<ParsedBurnTransaction | null>;
+}): Promise<BurnRecord> {
+  const parsed = input.fetchTransaction
+    ? await input.fetchTransaction(input.signature)
+    : await fetchParsedBurnTransaction(input.rpcUrl, input.signature, input.fetchImpl);
+  if (!parsed) {
+    throw new Error('The forest could not confirm the burn.');
+  }
+  return extractVerifiedMhoodBurnRecord({
+    signature: input.signature,
+    parsed,
+    mint: MHOOD_BURN_MINT,
+    decimals: MHOOD_BURN_DECIMALS,
+    expectedWallet: input.expectedWallet,
+  });
+}

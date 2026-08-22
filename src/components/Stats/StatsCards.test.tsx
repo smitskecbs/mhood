@@ -45,11 +45,13 @@ describe('burn UI defaults', () => {
   });
 
   it('shows on-chain current supply and total burned without fake leaderboard stats', () => {
-    render(<StatsCards mint={mint} snapshot={inactiveSnapshot} wallet={null} />);
+    render(<StatsCards mint={mint} snapshot={inactiveSnapshot} />);
     expect(screen.getByText('Current Supply')).toBeInTheDocument();
     expect(screen.getByText('999,999,998 MHOOD')).toBeInTheDocument();
-    expect(screen.getByText('Total MHOOD Burned')).toBeInTheDocument();
+    expect(screen.getByText('Total Burned')).toBeInTheDocument();
     expect(screen.getByText('2 MHOOD')).toBeInTheDocument();
+    expect(screen.getByText('Indexed Burn Amount')).toBeInTheDocument();
+    expect(screen.getByText('Total Burn Transactions')).toBeInTheDocument();
     expect(screen.queryByText('99')).not.toBeInTheDocument();
     expect(screen.queryByText('12')).not.toBeInTheDocument();
     expect(screen.getAllByText('—').length).toBeGreaterThan(0);
@@ -58,7 +60,28 @@ describe('burn UI defaults', () => {
   });
 
   it('does not use the leaderboard total as global burned supply', () => {
-    render(<StatsCards mint={mint} snapshot={inactiveSnapshot} wallet={null} />);
+    render(<StatsCards mint={mint} snapshot={inactiveSnapshot} />);
     expect(screen.queryByText('999,999.999999')).not.toBeInTheDocument();
+  });
+
+  it('shows an indexed vs on-chain gap when history is incomplete', () => {
+    render(
+      <StatsCards
+        mint={mint}
+        snapshot={{
+          ...inactiveSnapshot,
+          persistence: 'persistent',
+          live: true,
+          source: 'local',
+          entries: [],
+          records: [],
+          totalBurnedRaw: '1000000',
+          totalBurns: 1,
+          uniqueBurners: 1,
+        }}
+      />,
+    );
+    expect(screen.getByText('2 MHOOD burned on-chain · 1 MHOOD indexed')).toBeInTheDocument();
+    expect(screen.getByText('1 MHOOD')).toBeInTheDocument();
   });
 });

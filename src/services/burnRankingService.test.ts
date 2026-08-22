@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { aggregateBurnRecords, findBurnRank, findWalletBurnedRaw } from './burnRankingService';
+import { aggregateBurnRecords, findBurnRank, findWalletBurnCount, findWalletBurnedRaw } from './burnRankingService';
 import { PROJECT_WALLETS } from '../config/projectWallets';
 
 describe('burnRankingService', () => {
@@ -54,6 +54,40 @@ describe('burnRankingService', () => {
     expect(snapshot.entries[1]?.lastBurn).toBe(30);
     expect(findBurnRank(snapshot, 'WALLET_A')).toBe(2);
     expect(findWalletBurnedRaw(snapshot, 'WALLET_A')).toBe(1500n);
+  });
+
+  it('aggregates two 1 MHOOD burns from the same wallet as 2 MHOOD and rank 1', () => {
+    const snapshot = aggregateBurnRecords(
+      [
+        {
+          signature: 'sig-1',
+          wallet: 'memekrM9YqzBQBmHjgne8CHeaPicxwFDxeMo3bkHwMY',
+          mint: 'EiuaNV7T3Uz7yoVxkgxZQGXENreyBUqDWnfBLjbsYVVs',
+          amountRaw: '1000000',
+          amountUi: '1',
+          slot: 1,
+          timestamp: 10,
+        },
+        {
+          signature: 'sig-2',
+          wallet: 'memekrM9YqzBQBmHjgne8CHeaPicxwFDxeMo3bkHwMY',
+          mint: 'EiuaNV7T3Uz7yoVxkgxZQGXENreyBUqDWnfBLjbsYVVs',
+          amountRaw: '1000000',
+          amountUi: '1',
+          slot: 2,
+          timestamp: 20,
+        },
+      ],
+      6,
+    );
+    expect(snapshot.totalBurnedRaw).toBe('2000000');
+    expect(snapshot.totalBurns).toBe(2);
+    expect(snapshot.uniqueBurners).toBe(1);
+    expect(snapshot.entries[0]?.burns).toBe(2);
+    expect(snapshot.entries[0]?.rank).toBe(1);
+    expect(findBurnRank(snapshot, 'memekrM9YqzBQBmHjgne8CHeaPicxwFDxeMo3bkHwMY')).toBe(1);
+    expect(findWalletBurnedRaw(snapshot, 'memekrM9YqzBQBmHjgne8CHeaPicxwFDxeMo3bkHwMY')).toBe(2_000_000n);
+    expect(findWalletBurnCount(snapshot, 'memekrM9YqzBQBmHjgne8CHeaPicxwFDxeMo3bkHwMY')).toBe(2);
   });
 
   it('does not invent per-wallet leaderboard records from global supply', () => {

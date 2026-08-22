@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "backfill:burns": "node --env-file=.env scripts/backfill-verified-burns.mjs"
   },
   "dependencies": {
     "@solana/spl-token": "^0.4.13",

@@ -360,7 +360,8 @@ export async function submitAndVerifyBurn(params: {
 
 function persistenceFromResult(result: unknown): BurnPersistenceMode {
   if (result && typeof result === 'object' && 'persistence' in result) {
-    return (result as { persistence?: unknown }).persistence === 'inactive' ? 'inactive' : 'local';
+    const value = (result as { persistence?: unknown }).persistence;
+    if (value === 'inactive' || value === 'local' || value === 'persistent') return value;
   }
   return 'local';
 }

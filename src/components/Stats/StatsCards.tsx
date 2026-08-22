@@ -1,21 +1,19 @@
 import { formatTokenAmount } from '../../utils/tokenAmount';
-import { totalBurnedFromSupply } from '../../utils/mhoodSupply';
+import { indexedBurnGapMessage, totalBurnedFromSupply } from '../../utils/mhoodSupply';
 import type { BurnRankingSnapshot, MintDetails } from '../../types';
 import { ForestPanel } from '../layout/ForestPanel';
 
 type StatsCardsProps = {
   mint: MintDetails;
   snapshot: BurnRankingSnapshot | null;
-  wallet: string | null;
 };
 
-export function StatsCards({ mint, snapshot, wallet }: StatsCardsProps) {
+export function StatsCards({ mint, snapshot }: StatsCardsProps) {
   const currentSupply = mint.supplyRaw;
-  const totalBurned = totalBurnedFromSupply(currentSupply);
-  const leaderboardReady = snapshot != null && snapshot.persistence !== 'inactive';
-  const yourRank = leaderboardReady
-    ? snapshot.entries.find((entry) => entry.wallet === wallet)?.rank ?? null
-    : null;
+  const onChainBurned = totalBurnedFromSupply(currentSupply);
+  const indexed = snapshot != null && snapshot.persistence !== 'inactive';
+  const indexedBurnedRaw = indexed ? BigInt(snapshot.totalBurnedRaw) : 0n;
+  const gap = indexed ? indexedBurnGapMessage(onChainBurned, indexedBurnedRaw, mint.decimals) : null;
 
   return (
     <ForestPanel eyebrow="The grove keeps count" title="Forest memory">
@@ -25,22 +23,25 @@ export function StatsCards({ mint, snapshot, wallet }: StatsCardsProps) {
           <p className="stat-value">{formatTokenAmount(currentSupply, mint.decimals)} MHOOD</p>
         </article>
         <article className="stat-card">
-          <p className="stat-label">Total MHOOD Burned</p>
-          <p className="stat-value">{formatTokenAmount(totalBurned, mint.decimals)} MHOOD</p>
+          <p className="stat-label">Total Burned</p>
+          <p className="stat-value">{formatTokenAmount(onChainBurned, mint.decimals)} MHOOD</p>
         </article>
         <article className="stat-card">
-          <p className="stat-label">Total Burns</p>
-          <p className="stat-value">{leaderboardReady ? snapshot.totalBurns : '—'}</p>
+          <p className="stat-label">Indexed Burn Amount</p>
+          <p className="stat-value">
+            {indexed ? `${formatTokenAmount(indexedBurnedRaw, mint.decimals)} MHOOD` : '—'}
+          </p>
+        </article>
+        <article className="stat-card">
+          <p className="stat-label">Total Burn Transactions</p>
+          <p className="stat-value">{indexed ? snapshot.totalBurns : '—'}</p>
         </article>
         <article className="stat-card">
           <p className="stat-label">Unique Burners</p>
-          <p className="stat-value">{leaderboardReady ? snapshot.uniqueBurners : '—'}</p>
-        </article>
-        <article className="stat-card">
-          <p className="stat-label">Your Burn Rank</p>
-          <p className="stat-value">{yourRank ? `#${yourRank}` : '—'}</p>
+          <p className="stat-value">{indexed ? snapshot.uniqueBurners : '—'}</p>
         </article>
       </div>
+      {gap ? <p className="muted stats-gap">{gap}</p> : null}
     </ForestPanel>
   );
 }

@@ -674,7 +674,7 @@ a.wallet-picker__button {
 .wallet-summary__grid,
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 14px;
   margin-bottom: 16px;
 }
@@ -688,9 +688,8 @@ a.wallet-picker__button {
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
-.stat-value {
-  margin: 4px 0 0;
-  font-size: 1.05rem;
+.stats-gap {
+  margin-top: 12px;
 }
 
 .forest-columns {
