@@ -27,10 +27,13 @@ describe('real burn architecture', () => {
     const admin = readFileSync(path.resolve(process.cwd(), 'api/admin/backfill-burns.ts'), 'utf8');
     const verify = readFileSync(path.resolve(process.cwd(), 'server/verifyOnChainBurn.ts'), 'utf8');
     const core = readFileSync(path.resolve(process.cwd(), 'src/services/burnVerificationCore.ts'), 'utf8');
-    expect(admin).not.toMatch(/@solana\/web3\.js|rpc-websockets|verifiedBurnsApi/);
+    const seed = readFileSync(path.resolve(process.cwd(), 'server/backfillVerifiedBurns.ts'), 'utf8');
+    expect(admin).not.toMatch(/@solana\/web3\.js|rpc-websockets|verifiedBurnsApi|getSignaturesForAddress/);
+    expect(seed).not.toMatch(/getSignaturesForAddress|listSignaturesForAddress|backfillBurnHistory/);
     expect(verify).toMatch(/heliusRpc/);
+    expect(verify).toMatch(/getTransaction/);
     expect(verify).toMatch(/burnVerificationCore/);
-    expect(verify).not.toMatch(/from ['"]@solana\/web3\.js['"]|rpc-websockets|new Connection/);
+    expect(verify).not.toMatch(/getSignaturesForAddress/);
     expect(core).not.toMatch(/from ['"]@solana\/web3\.js['"]|from ['"]@solana\/spl-token['"]|rpc-websockets/);
   });
 });

@@ -2,86 +2,103 @@ import type { BurnRecord } from '../src/types/index.js';
 import {
   KNOWN_BURNER_WALLET,
   KNOWN_MHOOD_BURN_SIGNATURES,
-  MHOOD_BURN_MINT,
 } from './knownMhoodBurns.js';
-import { listSignaturesForAddress } from './solanaJsonRpc.js';
 import type { VerifiedBurnStore } from './verifiedBurnStore.js';
 import { verifyOnChainMhoodBurn } from './verifyOnChainBurn.js';
 
-export type BackfillResult = {
-  scanned: number;
-  imported: BurnRecord[];
-  duplicates: string[];
-  rejected: Array<{ signature: string; reason: string }>;
+export type SeedBackfillResult = {
+  mode: 'seed';
+  verified: number;
+  inserted: number;
+  alreadyIndexed: number;
+  failed: number;
+  records: BurnRecord[];
+  alreadyIndexedSignatures: string[];
+  failures: Array<{ signature: string; reason: string }>;
 };
 
-export async function collectBackfillSignatures(input: {
-  rpcUrl: string;
-  mint?: string;
-  wallet?: string;
-  seedSignatures?: readonly string[];
-  fetchImpl?: typeof fetch;
-  listSignatures?: (address: string) => Promise<string[]>;
-}): Promise<string[]> {
-  const mint = input.mint ?? MHOOD_BURN_MINT;
-  const wallet = input.wallet ?? KNOWN_BURNER_WALLET;
-  const seed = input.seedSignatures ?? KNOWN_MHOOD_BURN_SIGNATURES;
-  const found = new Set<string>(seed);
-  const list =
-    input.listSignatures ??
-    ((address: string) =>
-      listSignaturesForAddress(input.rpcUrl, address, { fetchImpl: input.fetchImpl }));
-  for (const address of [wallet, mint]) {
-    const signatures = await list(address);
-    for (const signature of signatures) found.add(signature);
+function uniqueSignatures(signatures: readonly string[]): string[] {
+  const seen = new Set<string>();
+  const ordered: string[] = [];
+  for (const signature of signatures) {
+    const trimmed = signature.trim();
+    if (!trimmed || seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    ordered.push(trimmed);
   }
-  return [...found];
+  return ordered;
 }
 
-export async function backfillVerifiedBurns(input: {
+/**
+ * Fast one-time import: verify known signatures with getTransaction only.
+ * Does not scan wallet/mint history.
+ */
+export async function backfillSeedSignatures(input: {
   rpcUrl: string;
   store: VerifiedBurnStore;
-  mint?: string;
-  wallet?: string;
-  seedSignatures?: readonly string[];
+  signatures?: readonly string[];
+  expectedWallet?: string;
   fetchImpl?: typeof fetch;
-  listSignatures?: (address: string) => Promise<string[]>;
+  timeoutMs?: number;
   verify?: (signature: string) => Promise<BurnRecord>;
-}): Promise<BackfillResult> {
-  const signatures = await collectBackfillSignatures(input);
-  const imported: BurnRecord[] = [];
-  const duplicates: string[] = [];
-  const rejected: Array<{ signature: string; reason: string }> = [];
+}): Promise<SeedBackfillResult> {
+  const signatures = uniqueSignatures(input.signatures ?? KNOWN_MHOOD_BURN_SIGNATURES);
+  const expectedWallet = input.expectedWallet ?? KNOWN_BURNER_WALLET;
+  const records: BurnRecord[] = [];
+  const alreadyIndexedSignatures: string[] = [];
+  const failures: Array<{ signature: string; reason: string }> = [];
   const verify =
     input.verify ??
     ((signature: string) =>
       verifyOnChainMhoodBurn({
         signature,
         rpcUrl: input.rpcUrl,
+        expectedWallet,
         fetchImpl: input.fetchImpl,
+        timeoutMs: input.timeoutMs,
       }));
 
   for (const signature of signatures) {
     const existing = await input.store.get(signature);
     if (existing) {
-      duplicates.push(signature);
+      alreadyIndexedSignatures.push(signature);
       continue;
     }
     try {
       const record = await verify(signature);
       const saved = await input.store.add(record);
-      if (saved.added) imported.push(saved.record);
-      else duplicates.push(signature);
+      if (saved.added) records.push(saved.record);
+      else alreadyIndexedSignatures.push(signature);
     } catch (err) {
-      rejected.push({
+      failures.push({
         signature,
         reason: err instanceof Error ? err.message : 'Rejected burn candidate',
       });
     }
   }
 
+  const inserted = records.length;
+  const alreadyIndexed = alreadyIndexedSignatures.length;
+  const failed = failures.length;
+  const verified = inserted + alreadyIndexed;
   console.info(
-    `[MoginHood] backfill scanned=${signatures.length} imported=${imported.length} duplicates=${duplicates.length} rejected=${rejected.length}`,
+    `[MoginHood] seed backfill verified=${verified} inserted=${inserted} alreadyIndexed=${alreadyIndexed} failed=${failed}`,
   );
-  return { scanned: signatures.length, imported, duplicates, rejected };
+  return {
+    mode: 'seed',
+    verified,
+    inserted,
+    alreadyIndexed,
+    failed,
+    records,
+    alreadyIndexedSignatures,
+    failures,
+  };
+}
+
+/** Seed-only alias used by the admin endpoint. History scan is a separate module. */
+export async function backfillVerifiedBurns(
+  input: Parameters<typeof backfillSeedSignatures>[0],
+): Promise<SeedBackfillResult> {
+  return backfillSeedSignatures(input);
 }

@@ -5,7 +5,7 @@ import { handleJsonRpcProxy } from './rpcProxy.js';
 import { authorizeBackfillRequest } from './backfillAuth.js';
 import { handleVerifiedBurnsRequest } from './verifiedBurnsApi.js';
 import { createVerifiedBurnStore } from './createVerifiedBurnStore.js';
-import { backfillVerifiedBurns } from './backfillVerifiedBurns.js';
+import { backfillSeedSignatures } from './backfillVerifiedBurns.js';
 
 function mergedEnv(root: string, mode: string): NodeJS.Dict<string> {
   return { ...process.env, ...loadEnv(mode, root, '') };
@@ -109,15 +109,17 @@ async function handleBackfill(
     return;
   }
   const store = createVerifiedBurnStore(env, { fileRoot: root });
-  const result = await backfillVerifiedBurns({ rpcUrl, store });
+  const result = await backfillSeedSignatures({ rpcUrl, store });
   sendJson(res, 200, {
     ok: true,
+    mode: result.mode,
     persistence: store.persistence,
-    scanned: result.scanned,
-    imported: result.imported.length,
-    duplicates: result.duplicates.length,
-    rejected: result.rejected.length,
-    records: result.imported,
+    verified: result.verified,
+    inserted: result.inserted,
+    alreadyIndexed: result.alreadyIndexed,
+    failed: result.failed,
+    records: result.records,
+    failures: result.failures,
   });
 }
 

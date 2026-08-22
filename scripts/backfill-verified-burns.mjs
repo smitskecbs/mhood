@@ -18,7 +18,11 @@ if (!secret) {
 
 const response = await fetch(`${base}/api/admin/backfill-burns`, {
   method: 'POST',
-  headers: { Authorization: `Bearer ${secret}` },
+  headers: {
+    Authorization: `Bearer ${secret}`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({ mode: 'seed' }),
 });
 const payload = await response.json().catch(() => ({}));
 if (!response.ok) {

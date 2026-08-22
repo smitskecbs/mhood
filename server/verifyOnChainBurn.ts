@@ -17,11 +17,12 @@ export async function fetchParsedBurnTransaction(
   rpcUrl: string,
   signature: string,
   fetchImpl: typeof fetch = fetch,
+  timeoutMs?: number,
 ): Promise<ParsedBurnTransaction | null> {
   return heliusRpc<ParsedBurnTransaction | null>(
     'getTransaction',
     [signature, { encoding: 'jsonParsed', maxSupportedTransactionVersion: 0, commitment: 'confirmed' }],
-    { rpcUrl, fetchImpl },
+    { rpcUrl, fetchImpl, timeoutMs },
   );
 }
 
@@ -30,11 +31,12 @@ export async function verifyOnChainMhoodBurn(input: {
   rpcUrl: string;
   expectedWallet?: string;
   fetchImpl?: typeof fetch;
+  timeoutMs?: number;
   fetchTransaction?: (signature: string) => Promise<ParsedBurnTransaction | null>;
 }): Promise<BurnRecord> {
   const parsed = input.fetchTransaction
     ? await input.fetchTransaction(input.signature)
-    : await fetchParsedBurnTransaction(input.rpcUrl, input.signature, input.fetchImpl);
+    : await fetchParsedBurnTransaction(input.rpcUrl, input.signature, input.fetchImpl, input.timeoutMs);
   if (!parsed) {
     throw new Error('The forest could not confirm the burn.');
   }

@@ -55,7 +55,7 @@ function mockHeliusFetch(): typeof fetch {
       params?: unknown[];
     };
     if (body.method === 'getSignaturesForAddress') {
-      return jsonResponse({ result: [] });
+      throw new Error('seed backfill must not scan history');
     }
     if (body.method === 'getTransaction') {
       const signature = String(body.params?.[0] ?? '');
@@ -138,7 +138,8 @@ describe('admin burn backfill HTTP-only runtime', () => {
       logLevel: 'silent',
     });
     const code = bundled.outputFiles?.[0]?.text ?? '';
-    expect(code).toMatch(/heliusRpc|getTransaction|getSignaturesForAddress/);
+    expect(code).toMatch(/getTransaction/);
+    expect(code).not.toMatch(/getSignaturesForAddress/);
     expect(code).not.toMatch(/rpc-websockets/);
     expect(code).not.toMatch(/@solana\/web3\.js/);
     expect(code).not.toMatch(/@solana\/spl-token/);
@@ -197,11 +198,21 @@ describe('admin burn backfill HTTP-only runtime', () => {
     expect(result.status).toBe(200);
     const body = result.body as {
       ok: boolean;
-      imported: number;
+      mode: string;
+      verified: number;
+      inserted: number;
+      alreadyIndexed: number;
+      failed: number;
       records: Array<{ signature: string; wallet: string; amountUi: string; amountRaw: string }>;
     };
-    expect(body.ok).toBe(true);
-    expect(body.imported).toBe(2);
+    expect(body).toMatchObject({
+      ok: true,
+      mode: 'seed',
+      verified: 2,
+      inserted: 2,
+      alreadyIndexed: 0,
+      failed: 0,
+    });
     expect(body.records.map((record) => record.signature).sort()).toEqual([SIG_1, SIG_2].sort());
     expect(body.records.every((record) => record.wallet === KNOWN_BURNER_WALLET)).toBe(true);
     expect(body.records.every((record) => record.amountRaw === '1000000')).toBe(true);
@@ -212,6 +223,23 @@ describe('admin burn backfill HTTP-only runtime', () => {
     const burned = stored.reduce((total, record) => total + BigInt(record.amountRaw), 0n);
     expect(burned).toBe(2_000_000n);
     expect(new Set(stored.map((record) => record.wallet))).toEqual(new Set([KNOWN_BURNER_WALLET]));
+
+    const again = await handleAdminBackfillRequest({
+      httpMethod: 'POST',
+      headers: { authorization: 'Bearer forest-secret' },
+      env: {
+        BURN_BACKFILL_SECRET: 'forest-secret',
+        HELIUS_RPC_URL: 'https://example.helius.invalid',
+      },
+      store,
+      fetchImpl: mockHeliusFetch(),
+    });
+    expect(again.body).toMatchObject({
+      verified: 2,
+      inserted: 0,
+      alreadyIndexed: 2,
+      failed: 0,
+    });
   });
 
   it('stores verified records through an Upstash mock', async () => {
@@ -238,7 +266,7 @@ describe('admin burn backfill HTTP-only runtime', () => {
       fetchImpl: mockHeliusFetch(),
     });
     expect(result.status).toBe(200);
-    expect((result.body as { imported: number }).imported).toBe(2);
+    expect((result.body as { inserted: number }).inserted).toBe(2);
     expect(await store.list()).toHaveLength(2);
     expect(data.size).toBe(2);
   });
@@ -256,7 +284,7 @@ describe('admin burn backfill HTTP-only runtime', () => {
       fetchImpl: mockUpstashAndHeliusFetch(),
     });
     expect(result.status).toBe(200);
-    expect((result.body as { imported: number; persistence: string }).imported).toBe(2);
+    expect((result.body as { inserted: number; persistence: string }).inserted).toBe(2);
     expect((result.body as { persistence: string }).persistence).toBe('persistent');
   });
 
@@ -265,5 +293,19 @@ describe('admin burn backfill HTTP-only runtime', () => {
     const response = await POST(new Request('http://localhost/api/admin/backfill-burns', { method: 'POST' }));
     expect(response.status).toBe(404);
     await expect(response.json()).resolves.toEqual({ error: 'Not found' });
+  });
+
+  it('rejects history mode so a long scan cannot share this request', async () => {
+    const result = await handleAdminBackfillRequest({
+      httpMethod: 'POST',
+      headers: { authorization: 'Bearer forest-secret' },
+      body: { mode: 'history' },
+      env: {
+        BURN_BACKFILL_SECRET: 'forest-secret',
+        HELIUS_RPC_URL: 'https://example.helius.invalid',
+      },
+    });
+    expect(result.status).toBe(400);
+    expect(result.body).toEqual({ error: 'Only seed backfill is available in this request.' });
   });
 });
