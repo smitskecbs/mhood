@@ -14,13 +14,18 @@ async function readJsonBody(request: Request): Promise<unknown> {
 }
 
 export async function POST(request: Request): Promise<Response> {
-  const result = await handleAdminBackfillRequest({
-    httpMethod: 'POST',
-    headers: request.headers,
-    body: await readJsonBody(request),
-    env: process.env,
-  });
-  return Response.json(result.body, { status: result.status });
+  try {
+    const result = await handleAdminBackfillRequest({
+      httpMethod: 'POST',
+      headers: request.headers,
+      body: await readJsonBody(request),
+      env: process.env,
+    });
+    return Response.json(result.body, { status: result.status });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Backfill failed';
+    return Response.json({ ok: false, stage: 'unexpected', error: message }, { status: 500 });
+  }
 }
 
 export async function GET(): Promise<Response> {

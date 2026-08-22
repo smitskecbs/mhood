@@ -1,4 +1,5 @@
 import type { BurnPersistenceMode, BurnRecord } from '../src/types/index.js';
+import { fetchJsonWithTimeout } from './fetchWithTimeout.js';
 
 export const VERIFIED_BURNS_REDIS_KEY = 'moginhood:verified-burns';
 
@@ -10,6 +11,7 @@ export interface VerifiedBurnStore {
   list(): Promise<BurnRecord[]>;
   get(signature: string): Promise<BurnRecord | null>;
   add(record: BurnRecord): Promise<{ record: BurnRecord; added: boolean }>;
+  health(): Promise<void>;
 }
 
 export function isBurnRecord(value: unknown): value is BurnRecord {
@@ -58,6 +60,8 @@ export class MemoryVerifiedBurnStore implements VerifiedBurnStore {
     this.records.set(record.signature, record);
     return { record, added: true };
   }
+
+  async health(): Promise<void> {}
 }
 
 export class InactiveVerifiedBurnStore implements VerifiedBurnStore {
@@ -75,7 +79,12 @@ export class InactiveVerifiedBurnStore implements VerifiedBurnStore {
   async add(record: BurnRecord): Promise<{ record: BurnRecord; added: boolean }> {
     return { record, added: false };
   }
+
+  async health(): Promise<void> {}
 }
+
+export const BURN_STORE_HEALTH_FIELD = '__health_probe__';
+export const UPSTASH_TIMEOUT_MS = 5_000;
 
 export type RedisCommandExecutor = (command: string[]) => Promise<unknown>;
 
@@ -121,6 +130,10 @@ export class UpstashVerifiedBurnStore implements VerifiedBurnStore {
     }
     const existing = await this.get(record.signature);
     return { record: existing ?? record, added: false };
+  }
+
+  async health(): Promise<void> {
+    await this.execute(['HGET', VERIFIED_BURNS_REDIS_KEY, BURN_STORE_HEALTH_FIELD]);
   }
 }
 
@@ -188,28 +201,46 @@ export async function executeUpstashCommand(
   credentials: { url: string; token: string },
   command: string[],
   fetchImpl: typeof fetch = fetch,
+  timeoutMs: number = UPSTASH_TIMEOUT_MS,
 ): Promise<unknown> {
-  const response = await fetchImpl(credentials.url, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${credentials.token}`,
-      'Content-Type': 'application/json',
+  const op = (command[0] ?? '').toUpperCase();
+  const timeoutMessage =
+    op === 'HSETNX' || op === 'HSET' || op === 'SET' ? 'Upstash write timeout' : 'Upstash read timeout';
+  const url = credentials.url.replace(/\/$/, '');
+  const { ok, status, payload } = await fetchJsonWithTimeout(
+    fetchImpl,
+    url,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${credentials.token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(command),
     },
-    body: JSON.stringify(command),
-  });
-  const payload = (await response.json().catch(() => ({}))) as { result?: unknown; error?: string };
-  if (!response.ok) {
-    throw new Error(payload.error || `Upstash Redis request failed (${response.status})`);
+    timeoutMs,
+    timeoutMessage,
+  );
+  const body = payload as { result?: unknown; error?: string };
+  if (!ok) {
+    throw new Error(body.error || `Upstash Redis request failed (${status})`);
   }
-  return payload.result;
+  return body.result;
+}
+
+export async function verifyBurnStoreHealth(store: VerifiedBurnStore): Promise<void> {
+  await store.health();
 }
 
 export function createUpstashVerifiedBurnStore(
   env: NodeJS.Dict<string>,
   fetchImpl: typeof fetch = fetch,
+  timeoutMs: number = UPSTASH_TIMEOUT_MS,
 ): UpstashVerifiedBurnStore | null {
   const credentials = readUpstashCredentials(env);
   if (!credentials) return null;
   logSelectedCredentials(credentials);
-  return new UpstashVerifiedBurnStore((command) => executeUpstashCommand(credentials, command, fetchImpl));
+  return new UpstashVerifiedBurnStore((command) =>
+    executeUpstashCommand(credentials, command, fetchImpl, timeoutMs),
+  );
 }

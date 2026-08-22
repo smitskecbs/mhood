@@ -7,9 +7,9 @@ import { FileVerifiedBurnStore, fileVerifiedBurnStorePath } from './fileVerified
 
 export function createVerifiedBurnStore(
   env: NodeJS.Dict<string> = process.env,
-  options?: { fileRoot?: string; fetchImpl?: typeof fetch },
+  options?: { fileRoot?: string; fetchImpl?: typeof fetch; upstashTimeoutMs?: number },
 ): VerifiedBurnStore {
-  const upstash = createUpstashVerifiedBurnStore(env, options?.fetchImpl);
+  const upstash = createUpstashVerifiedBurnStore(env, options?.fetchImpl, options?.upstashTimeoutMs);
   if (upstash) return upstash;
   if (options?.fileRoot) {
     return new FileVerifiedBurnStore(fileVerifiedBurnStorePath(options.fileRoot));

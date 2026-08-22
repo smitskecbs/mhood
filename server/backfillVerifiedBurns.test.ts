@@ -172,20 +172,19 @@ describe('seed verified burn backfill', () => {
     expect(failedTx.failures[0]?.reason).toMatch(/failed on-chain/);
   });
 
-  it('times out a hanging getTransaction without blocking the rest of the seed', async () => {
+  it('aborts the seed with a stage error when getTransaction times out', async () => {
     const store = new MemoryVerifiedBurnStore();
     const methods: string[] = [];
     const started = Date.now();
-    const result = await backfillSeedSignatures({
-      rpcUrl: 'https://example.helius.invalid',
-      store,
-      signatures: [SIG_1, SIG_2],
-      timeoutMs: 25,
-      fetchImpl: (async (_url, init) => {
-        const body = JSON.parse(String(init?.body ?? '{}')) as { method?: string; params?: unknown[] };
-        methods.push(body.method ?? '');
-        const signature = String(body.params?.[0] ?? '');
-        if (signature === SIG_1) {
+    await expect(
+      backfillSeedSignatures({
+        rpcUrl: 'https://example.helius.invalid',
+        store,
+        signatures: [SIG_1, SIG_2],
+        timeoutMs: 25,
+        fetchImpl: (async (_url, init) => {
+          const body = JSON.parse(String(init?.body ?? '{}')) as { method?: string; params?: unknown[] };
+          methods.push(body.method ?? '');
           return await new Promise((_, reject) => {
             const abort = () => {
               const err = new Error('The operation was aborted');
@@ -195,16 +194,15 @@ describe('seed verified burn backfill', () => {
             if (init?.signal?.aborted) abort();
             else init?.signal?.addEventListener('abort', abort, { once: true });
           });
-        }
-        return jsonResponse({ result: parsedBurn() });
-      }) as typeof fetch,
+        }) as typeof fetch,
+      }),
+    ).rejects.toMatchObject({
+      name: 'BackfillStageError',
+      stage: 'helius-rpc',
+      message: 'RPC getTransaction timed out',
     });
     expect(Date.now() - started).toBeLessThan(2_000);
     expect(methods).not.toContain('getSignaturesForAddress');
-    expect(result.failed).toBe(1);
-    expect(result.inserted).toBe(1);
-    expect(result.failures[0]?.signature).toBe(SIG_1);
-    expect(result.failures[0]?.reason).toMatch(/timed out/);
-    expect((await store.list()).map((record) => record.signature)).toEqual([SIG_2]);
+    expect(await store.list()).toEqual([]);
   });
 });

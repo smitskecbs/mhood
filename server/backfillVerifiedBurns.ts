@@ -1,10 +1,14 @@
 import type { BurnRecord } from '../src/types/index.js';
+import { extractVerifiedMhoodBurnRecord } from '../src/services/burnVerificationCore.js';
+import { BackfillStageError, backfillLog } from './backfillLog.js';
 import {
   KNOWN_BURNER_WALLET,
   KNOWN_MHOOD_BURN_SIGNATURES,
+  MHOOD_BURN_DECIMALS,
+  MHOOD_BURN_MINT,
 } from './knownMhoodBurns.js';
 import type { VerifiedBurnStore } from './verifiedBurnStore.js';
-import { verifyOnChainMhoodBurn } from './verifyOnChainBurn.js';
+import { fetchParsedBurnTransaction } from './verifyOnChainBurn.js';
 
 export type SeedBackfillResult = {
   mode: 'seed';
@@ -29,6 +33,12 @@ function uniqueSignatures(signatures: readonly string[]): string[] {
   return ordered;
 }
 
+function asStageError(err: unknown, stage: string, status: number): BackfillStageError {
+  if (err instanceof BackfillStageError) return err;
+  const message = err instanceof Error ? err.message : 'Backfill stage failed';
+  return new BackfillStageError(stage, message, status);
+}
+
 /**
  * Fast one-time import: verify known signatures with getTransaction only.
  * Does not scan wallet/mint history.
@@ -47,43 +57,86 @@ export async function backfillSeedSignatures(input: {
   const records: BurnRecord[] = [];
   const alreadyIndexedSignatures: string[] = [];
   const failures: Array<{ signature: string; reason: string }> = [];
-  const verify =
-    input.verify ??
-    ((signature: string) =>
-      verifyOnChainMhoodBurn({
-        signature,
-        rpcUrl: input.rpcUrl,
-        expectedWallet,
-        fetchImpl: input.fetchImpl,
-        timeoutMs: input.timeoutMs,
-      }));
 
-  for (const signature of signatures) {
-    const existing = await input.store.get(signature);
+  backfillLog(`seed count: ${signatures.length}`);
+
+  for (let index = 0; index < signatures.length; index += 1) {
+    const signature = signatures[index]!;
+    const seedLabel = `seed ${index + 1}`;
+    backfillLog(`${seedLabel} start`);
+    backfillLog('checking existing record');
+    let existing: BurnRecord | null;
+    try {
+      existing = await input.store.get(signature);
+    } catch (err) {
+      throw asStageError(err, 'store-read', 502);
+    }
+    backfillLog(`existing check complete: ${Boolean(existing)}`);
     if (existing) {
       alreadyIndexedSignatures.push(signature);
+      backfillLog(`${seedLabel} complete`);
       continue;
     }
+
     try {
-      const record = await verify(signature);
-      const saved = await input.store.add(record);
+      let record: BurnRecord;
+      if (input.verify) {
+        record = await input.verify(signature);
+      } else {
+        backfillLog('requesting transaction from Helius');
+        let parsed;
+        try {
+          parsed = await fetchParsedBurnTransaction(
+            input.rpcUrl,
+            signature,
+            input.fetchImpl,
+            input.timeoutMs,
+            (status, durationMs) => {
+              backfillLog(`helius response status=${status} durationMs=${durationMs}`);
+            },
+          );
+        } catch (err) {
+          throw asStageError(err, 'helius-rpc', 502);
+        }
+        backfillLog('transaction received');
+        if (!parsed) {
+          throw new Error('The forest could not confirm the burn.');
+        }
+        backfillLog('verifying burn');
+        record = extractVerifiedMhoodBurnRecord({
+          signature,
+          parsed,
+          mint: MHOOD_BURN_MINT,
+          decimals: MHOOD_BURN_DECIMALS,
+          expectedWallet,
+        });
+        backfillLog('verification success');
+      }
+
+      backfillLog('writing record to store');
+      let saved: { record: BurnRecord; added: boolean };
+      try {
+        saved = await input.store.add(record);
+      } catch (err) {
+        throw asStageError(err, 'store-write', 502);
+      }
+      backfillLog('store write complete');
       if (saved.added) records.push(saved.record);
       else alreadyIndexedSignatures.push(signature);
     } catch (err) {
+      if (err instanceof BackfillStageError) throw err;
       failures.push({
         signature,
         reason: err instanceof Error ? err.message : 'Rejected burn candidate',
       });
     }
+    backfillLog(`${seedLabel} complete`);
   }
 
   const inserted = records.length;
   const alreadyIndexed = alreadyIndexedSignatures.length;
   const failed = failures.length;
   const verified = inserted + alreadyIndexed;
-  console.info(
-    `[MoginHood] seed backfill verified=${verified} inserted=${inserted} alreadyIndexed=${alreadyIndexed} failed=${failed}`,
-  );
   return {
     mode: 'seed',
     verified,

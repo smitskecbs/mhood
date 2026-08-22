@@ -41,6 +41,8 @@ export class FileVerifiedBurnStore implements VerifiedBurnStore {
     this.write([...records, record]);
     return { record, added: true };
   }
+
+  async health(): Promise<void> {}
 }
 
 export function fileVerifiedBurnStorePath(root: string): string {
