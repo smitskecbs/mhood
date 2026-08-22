@@ -1,0 +1,43 @@
+export const INTRO_HOLD_MS = 2400;
+export const CROSSFADE_MS = 2800;
+export const ACCESS_GRANTED_MS = 2200;
+export const FOREST_FADE_MS = 2200;
+export const BALANCE_REFRESH_MS = 45_000;
+
+export const BACKGROUNDS = {
+  gateI: '/backgrounds/background1.jpg',
+  gateII: '/backgrounds/background2.jpg',
+  forest: '/backgrounds/background3.jpg',
+} as const;
+
+export const COPY = {
+  gateLine: 'THE FOREST DOES NOT OPEN FOR EVERYONE.',
+  proveClaim: 'PROVE YOUR CLAIM',
+  proveClaimSub: 'Sign a message to prove this wallet belongs to you.',
+  signToEnter: 'Sign to enter',
+  forestClosed: 'The forest remains closed.',
+  tryAgain: 'Try again',
+  cannotSign: 'This wallet cannot sign the Forest access message.',
+  insufficient: 'THE FOREST KNOWS WHAT YOU CARRY.',
+  granted: 'ACCESS GRANTED',
+  forestCloses: 'THE FOREST CLOSES.',
+  rpcUnavailable: 'The forest cannot verify your MHOOD right now.',
+  rpcUnavailableDetail: 'RPC connection unavailable.',
+  ledgerReading: 'Reading the forest ledger...',
+  ledgerError: 'The forest ledger cannot be read right now.',
+  noBurns: 'No verified forest burns yet.',
+  yourPosition: 'Your position',
+  burnTitle: 'THE BURNING GROVE',
+  burnPrompt: 'Choose what you are willing to return to the forest.',
+  burnConfirmTitle: 'RETURN TO THE FOREST',
+  burnIrreversible: 'This action cannot be reversed.',
+  confirmBurn: 'Confirm burn',
+  verifiedBurn: 'VERIFIED BURN',
+  burnSuccessTitle: 'RETURNED TO THE FOREST',
+  offeringWithdrawn: 'The offering was withdrawn.',
+  burnUnconfirmed: 'The forest could not confirm the burn.',
+  burnCouldNotComplete: 'The burn could not be completed.',
+  distributionTitle: 'TOKEN DISTRIBUTION',
+  holdersTitle: 'FOREST HOLDERS',
+  legendsTitle: 'FOREST LEGENDS',
+} as const;

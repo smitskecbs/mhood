@@ -1,0 +1,78 @@
+import { COPY } from '../../config/constants';
+import { HOLDER_RANKING_VISIBLE_TOP } from '../../config/timing';
+import { shortenAddress } from '../../utils/format';
+import { findWalletRankingEntry } from '../../utils/holderAggregation';
+import type { HolderRankingSnapshot } from '../../types';
+import { ForestPanel } from '../layout/ForestPanel';
+
+type HolderRankingProps = {
+  snapshot: HolderRankingSnapshot | null;
+  loading: boolean;
+  error: string | null;
+  currentWallet: string | null;
+  onRetry: () => void;
+};
+
+export function HolderRanking({
+  snapshot,
+  loading,
+  error,
+  currentWallet,
+  onRetry,
+}: HolderRankingProps) {
+  const visible = (snapshot?.entries ?? []).slice(0, HOLDER_RANKING_VISIBLE_TOP);
+  const you = findWalletRankingEntry(snapshot, currentWallet);
+  const showYouOutsideTop = Boolean(you && !visible.some((entry) => entry.wallet === you.wallet));
+
+  return (
+    <ForestPanel eyebrow="Those who remain" title={COPY.holdersTitle}>
+      {loading ? (
+        <p className="ledger-reading" aria-live="polite">
+          {COPY.ledgerReading}
+        </p>
+      ) : null}
+      {error ? (
+        <div className="ranking-error">
+          <p className="gate-error">{error}</p>
+          <button type="button" className="forest-button forest-button--ghost" onClick={onRetry}>
+            Retry
+          </button>
+        </div>
+      ) : null}
+      {!loading && !error && snapshot ? (
+        <>
+          <div className="table-scroll">
+            <table className="forest-table">
+              <thead>
+                <tr>
+                  <th>Rank</th>
+                  <th>Wallet</th>
+                  <th>MHOOD</th>
+                  <th>% Supply</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visible.map((entry) => (
+                  <tr key={entry.wallet} className={entry.wallet === currentWallet ? 'is-you' : undefined}>
+                    <td>#{entry.rank}</td>
+                    <td>{shortenAddress(entry.wallet, 4)}</td>
+                    <td>{entry.balanceUi} MHOOD</td>
+                    <td>{entry.supplyPercent}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {showYouOutsideTop && you ? (
+            <div className="your-position">
+              <p className="forest-panel__eyebrow">{COPY.yourPosition}</p>
+              <p className="your-position__row">
+                #{you.rank} {shortenAddress(you.wallet, 3)} {you.balanceUi} MHOOD
+              </p>
+            </div>
+          ) : null}
+        </>
+      ) : null}
+    </ForestPanel>
+  );
+}
