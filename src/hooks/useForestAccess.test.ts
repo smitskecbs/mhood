@@ -136,6 +136,7 @@ describe('useForestAccess signature gate', () => {
       expect(result.current.status).toBe('granted');
     });
     expect(mocks.fetchBalance).toHaveBeenCalledTimes(1);
+    expect(mocks.fetchMint).toHaveBeenCalledTimes(1);
     expect(localStorage.getItem(AUTH_STORAGE_KEY)).toBeNull();
   });
 
@@ -242,6 +243,18 @@ describe('useForestAccess signature gate', () => {
       await result.current.authenticate();
     });
     await waitFor(() => expect(result.current.status).toBe('insufficient'));
+  });
+
+  it('starts holder verification once per Sign to enter', async () => {
+    const keypair = connectWallet();
+    mocks.fetchBalance.mockResolvedValue(balanceFor(keypair.publicKey.toBase58(), 19_811_049_000_000n));
+    const { result } = renderHook(() => useForestAccess());
+    await act(async () => {
+      await result.current.authenticate();
+    });
+    await waitFor(() => expect(result.current.status).toBe('granted'));
+    expect(mocks.fetchMint).toHaveBeenCalledTimes(1);
+    expect(mocks.fetchBalance).toHaveBeenCalledTimes(1);
   });
 
   it('maps a network failure to RPC unavailable', async () => {

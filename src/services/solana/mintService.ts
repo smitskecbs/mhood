@@ -10,7 +10,10 @@ import {
 } from '../../utils/holderVerificationError';
 import { postJsonRpc, unwrapRpcContextValue, type JsonRpcContextResult } from './jsonRpc';
 
+export const CLASSIC_SPL_MINT_SIZE = 82;
+
 let cachedMint: MintDetails | null = null;
+let inFlightMint: Promise<MintDetails> | null = null;
 
 function kindFromOwner(owner: string): TokenProgramKind {
   if (owner === TOKEN_2022_ID) return 'token-2022';
@@ -36,36 +39,104 @@ export type MintAccountDiagnostics = {
   dataLength: number | null;
   classicSplToken: boolean;
   decimals: number | null;
+  encoding?: string | null;
+  dataTuple?: boolean;
+  base64Length?: number | null;
 };
 
-export function decodeBase64AccountData(data: unknown): Buffer {
-  if (Array.isArray(data) && typeof data[0] === 'string') {
-    return Buffer.from(data[0], 'base64');
+export type Base64AccountDataTuple = {
+  base64Data: string;
+  encoding: string;
+};
+
+export function parseBase64AccountDataTuple(data: unknown): Base64AccountDataTuple {
+  if (!Array.isArray(data) || data.length < 2 || typeof data[0] !== 'string' || typeof data[1] !== 'string') {
+    throw new Error('Mint account data is not a [base64, encoding] tuple');
   }
-  throw new Error('Mint account data is not base64');
+  return { base64Data: data[0], encoding: data[1] };
+}
+
+/** Browser-safe base64 → bytes. Do not pass the `[base64, encoding]` tuple into Buffer.from. */
+export function decodeBase64ToBytes(base64: string): Uint8Array {
+  if (typeof atob === 'function') {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes;
+  }
+  return Uint8Array.from(Buffer.from(base64, 'base64'));
+}
+
+export function decodeBase64AccountData(data: unknown): Uint8Array {
+  const { base64Data, encoding } = parseBase64AccountDataTuple(data);
+  if (encoding !== 'base64') {
+    throw new Error(`Unsupported mint account encoding: ${encoding}`);
+  }
+  return decodeBase64ToBytes(base64Data);
+}
+
+export function assertClassicSplMintSize(byteLength: number): void {
+  if (byteLength !== CLASSIC_SPL_MINT_SIZE) {
+    throw new Error(`Unexpected classic SPL mint account size: ${byteLength} bytes`);
+  }
+}
+
+function readU32LE(bytes: Uint8Array, offset: number): number {
+  return bytes[offset]! | (bytes[offset + 1]! << 8) | (bytes[offset + 2]! << 16) | (bytes[offset + 3]! << 24);
+}
+
+function readU64LE(bytes: Uint8Array, offset: number): bigint {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  return view.getBigUint64(offset, true);
+}
+
+export function decodeClassicSplMint(bytes: Uint8Array): {
+  decimals: number;
+  supplyRaw: bigint;
+  mintAuthorityRevoked: boolean;
+  freezeAuthorityRevoked: boolean;
+} {
+  assertClassicSplMintSize(bytes.byteLength);
+  return {
+    mintAuthorityRevoked: readU32LE(bytes, 0) === 0,
+    supplyRaw: readU64LE(bytes, 36),
+    decimals: bytes[44]!,
+    freezeAuthorityRevoked: readU32LE(bytes, 46) === 0,
+  };
 }
 
 export function describeMintAccount(account: RpcMintAccountValue | null): MintAccountDiagnostics {
   const ownerProgramId = typeof account?.owner === 'string' ? account.owner : null;
+  let encoding: string | null = null;
+  let dataTuple = false;
+  let base64Length: number | null = null;
   let dataLength: number | null = typeof account?.space === 'number' ? account.space : null;
-  if (dataLength == null && account) {
-    try {
-      dataLength = decodeBase64AccountData(account.data).length;
-    } catch {
-      dataLength = null;
-    }
+  try {
+    const tuple = parseBase64AccountDataTuple(account?.data);
+    encoding = tuple.encoding;
+    dataTuple = true;
+    base64Length = tuple.base64Data.length;
+    dataLength = decodeBase64ToBytes(tuple.base64Data).byteLength;
+  } catch {
+    /* keep space-based length if the tuple cannot be read */
   }
   return {
     ownerProgramId,
     dataLength,
-    classicSplToken: ownerProgramId === SPL_TOKEN_PROGRAM_ID && dataLength === 82,
+    classicSplToken: ownerProgramId === SPL_TOKEN_PROGRAM_ID && dataLength === CLASSIC_SPL_MINT_SIZE,
     decimals: null,
+    encoding,
+    dataTuple,
+    base64Length,
   };
 }
 
 export function mintAccountInfoFromRpc(account: RpcMintAccountValue): AccountInfo<Buffer> {
+  const bytes = decodeBase64AccountData(account.data);
   return {
-    data: decodeBase64AccountData(account.data),
+    data: Buffer.from(bytes),
     executable: Boolean(account.executable),
     lamports: typeof account.lamports === 'number' ? account.lamports : 0,
     owner: new PublicKey(account.owner ?? ''),
@@ -73,22 +144,32 @@ export function mintAccountInfoFromRpc(account: RpcMintAccountValue): AccountInf
   };
 }
 
-/**
- * Reads mint account owner + mint state from a single getAccountInfo JSON-RPC call.
- * Decimals, program, and authorities come from chain — never from a hardcoded guess.
- */
-export async function fetchMintDetails(
-  _connection?: unknown,
-  mintAddress = appConfig.mintAddress,
-): Promise<MintDetails> {
-  requireConfiguredRpcUrl();
-  if (cachedMint && cachedMint.mint === mintAddress) {
-    return cachedMint;
+function logMintAccountResponse(account: RpcMintAccountValue, bytes: Uint8Array, encoding: string): void {
+  console.info('[MoginHood] mint account response', {
+    owner: account.owner,
+    executable: Boolean(account.executable),
+    encoding,
+    dataTuple: true,
+    base64Length: parseBase64AccountDataTuple(account.data).base64Data.length,
+    decodedByteLength: bytes.byteLength,
+  });
+}
+
+function canonicalMintAddress(mintAddress: string): string {
+  const trimmed = mintAddress.trim();
+  if (!trimmed) {
+    throw new Error('Mint address is empty');
   }
+  return new PublicKey(trimmed).toBase58();
+}
+
+async function loadMintDetails(mintAddress: string): Promise<MintDetails> {
+  requireConfiguredRpcUrl();
+  const mint = canonicalMintAddress(mintAddress);
 
   const result = await postJsonRpc<JsonRpcContextResult<RpcMintAccountValue | null>>({
     method: HOLDER_MINT_RPC_METHOD,
-    params: [mintAddress, { encoding: 'base64', commitment: 'confirmed' }],
+    params: [mint, { encoding: 'base64', commitment: 'confirmed' }],
     stage: 'mint-read',
   });
   const account = unwrapRpcContextValue<RpcMintAccountValue | null>(
@@ -96,14 +177,13 @@ export async function fetchMintDetails(
     'mint-read',
     HOLDER_MINT_RPC_METHOD,
   );
-  const diagnostics = describeMintAccount(account);
 
   if (!account || !account.owner) {
     throw new HolderVerificationError({
       stage: 'mint-read',
       method: HOLDER_MINT_RPC_METHOD,
-      message: `Mint account not found: ${mintAddress}`,
-      details: diagnostics,
+      message: `Mint account not found: ${mint}`,
+      details: describeMintAccount(account),
     });
   }
 
@@ -111,37 +191,121 @@ export async function fetchMintDetails(
   try {
     tokenProgramKind = kindFromOwner(account.owner);
   } catch (err) {
-    throw HolderVerificationError.from(err, 'mint-read', HOLDER_MINT_RPC_METHOD, { details: diagnostics });
-  }
-
-  const mint = new PublicKey(mintAddress);
-  const programId = programIdFromKind(tokenProgramKind);
-    const accountInfo = mintAccountInfoFromRpc(account);
-  let mintState;
-  try {
-    mintState = unpackMint(mint, accountInfo, programId);
-  } catch (err) {
     throw HolderVerificationError.from(err, 'mint-read', HOLDER_MINT_RPC_METHOD, {
-      details: diagnostics,
+      details: describeMintAccount(account),
     });
   }
 
-  cachedMint = {
-    mint: mintAddress,
-    decimals: mintState.decimals,
-    supplyRaw: mintState.supply,
+  let bytes: Uint8Array;
+  let encoding: string;
+  try {
+    const tuple = parseBase64AccountDataTuple(account.data);
+    encoding = tuple.encoding;
+    if (encoding !== 'base64') {
+      throw new Error(`Unsupported mint account encoding: ${encoding}`);
+    }
+    bytes = decodeBase64ToBytes(tuple.base64Data);
+  } catch (err) {
+    throw HolderVerificationError.from(err, 'mint-read', HOLDER_MINT_RPC_METHOD, {
+      details: describeMintAccount(account),
+    });
+  }
+
+  try {
+    logMintAccountResponse(account, bytes, encoding);
+  } catch {
+    /* diagnostics must not fail mint-read */
+  }
+
+  const programId = programIdFromKind(tokenProgramKind);
+  let decimals: number;
+  let supplyRaw: bigint;
+  let mintAuthorityRevoked: boolean;
+  let freezeAuthorityRevoked: boolean;
+
+  try {
+    if (tokenProgramKind === 'spl-token') {
+      assertClassicSplMintSize(bytes.byteLength);
+      const decoded = decodeClassicSplMint(bytes);
+      decimals = decoded.decimals;
+      supplyRaw = decoded.supplyRaw;
+      mintAuthorityRevoked = decoded.mintAuthorityRevoked;
+      freezeAuthorityRevoked = decoded.freezeAuthorityRevoked;
+    } else {
+      const layoutMint = unpackMint(
+        new PublicKey(mint),
+        {
+          data: Buffer.from(bytes),
+          executable: Boolean(account.executable),
+          lamports: typeof account.lamports === 'number' ? account.lamports : 0,
+          owner: new PublicKey(account.owner),
+          rentEpoch: typeof account.rentEpoch === 'number' ? account.rentEpoch : 0,
+        },
+        programId,
+      );
+      decimals = layoutMint.decimals;
+      supplyRaw = layoutMint.supply;
+      mintAuthorityRevoked = layoutMint.mintAuthority === null;
+      freezeAuthorityRevoked = layoutMint.freezeAuthority === null;
+    }
+  } catch (err) {
+    throw HolderVerificationError.from(err, 'mint-read', HOLDER_MINT_RPC_METHOD, {
+      details: { ...describeMintAccount(account), dataLength: bytes.byteLength },
+    });
+  }
+
+  try {
+    console.info('[MoginHood] mint decoded', {
+      program: tokenProgramKind === 'spl-token' ? 'classic SPL Token' : 'Token-2022',
+      byteLength: bytes.byteLength,
+      decimals,
+    });
+  } catch {
+    /* diagnostics must not fail mint-read */
+  }
+
+  return {
+    mint,
+    decimals,
+    supplyRaw,
     tokenProgramId: programId.toBase58(),
     tokenProgramKind,
-    mintAuthorityRevoked: mintState.mintAuthority === null,
-    freezeAuthorityRevoked: mintState.freezeAuthority === null,
-    space: accountInfo.data.length,
+    mintAuthorityRevoked,
+    freezeAuthorityRevoked,
+    space: bytes.byteLength,
   };
+}
 
-  return cachedMint;
+/**
+ * Reads mint account owner + mint state from a single getAccountInfo JSON-RPC call.
+ * Classic SPL mints are decoded from the 82-byte base64 payload only.
+ */
+export async function fetchMintDetails(
+  _connection?: unknown,
+  mintAddress = appConfig.mintAddress,
+): Promise<MintDetails> {
+  if (cachedMint && cachedMint.mint === mintAddress) {
+    return cachedMint;
+  }
+  if (inFlightMint) {
+    return inFlightMint;
+  }
+
+  inFlightMint = loadMintDetails(mintAddress)
+    .then((details) => {
+      cachedMint = details;
+      return details;
+    })
+    .finally(() => {
+      inFlightMint = null;
+    });
+
+  return inFlightMint;
 }
 
 export function clearMintCache(): void {
   cachedMint = null;
+  inFlightMint = null;
 }
 
 export function getTokenProgramPublicKey(kind: TokenProgramKind): PublicKey {

@@ -42,6 +42,8 @@ export function useForestAccess() {
   const [signing, setSigning] = useState(false);
   const requestId = useRef(0);
   const holderStartedFor = useRef<string | null>(null);
+  const refreshInFlight = useRef(false);
+  const refreshRef = useRef<(options?: { recheck?: boolean }) => Promise<WalletMhoodBalance | null>>(async () => null);
 
   const signerSupported = walletCanSignMessage(signMessage, wallet?.adapter);
   const displayAuthIssue: AuthIssue | null =
@@ -60,6 +62,11 @@ export function useForestAccess() {
         setChecking(false);
         return null;
       }
+
+      if (refreshInFlight.current && !options?.recheck) {
+        return null;
+      }
+      refreshInFlight.current = true;
 
       const id = ++requestId.current;
       setChecking(true);
@@ -124,10 +131,12 @@ export function useForestAccess() {
         if (id === requestId.current) {
           setChecking(false);
         }
+        refreshInFlight.current = false;
       }
     },
     [walletAddress, connected, authenticated],
   );
+  refreshRef.current = refresh;
 
   const authenticate = useCallback(async () => {
     if (!publicKey || !connected || !walletAddress) return;
@@ -249,8 +258,8 @@ export function useForestAccess() {
     }
 
     holderStartedFor.current = walletAddress;
-    void refresh();
-  }, [walletAddress, connected, authenticated, refresh]);
+    void refreshRef.current();
+  }, [walletAddress, connected, authenticated]);
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;
@@ -269,10 +278,10 @@ export function useForestAccess() {
       return;
     }
     const timer = window.setInterval(() => {
-      void refresh();
+      void refreshRef.current();
     }, BALANCE_REFRESH_MS);
     return () => window.clearInterval(timer);
-  }, [walletAddress, connected, authenticated, refresh]);
+  }, [walletAddress, connected, authenticated]);
 
   const bypass = isDevBypassGateEnabled();
   const status: AccessStatus = resolveAccessStatus({
