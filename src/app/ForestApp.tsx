@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useWallet } from '@solana/wallet-adapter-react';
 import { COPY } from '../config/constants';
-import { isRealBurnEnabled, formatMintForLog, appConfig } from '../config/env';
+import { appConfig, isRealBurnEnabled, formatMintForLog } from '../config/env';
 import { gateWalletUiDelayMs, getCinematicTiming } from '../config/timing';
+import { AccessDeniedScene } from '../components/AccessDenied/AccessDeniedScene';
 import { BackgroundLayers } from '../components/cinematic/BackgroundLayers';
 import { ForestDashboard } from '../components/ForestDashboard/ForestDashboard';
 import { AccessDebugPanel } from '../components/layout/AccessDebugPanel';
@@ -11,21 +13,30 @@ import { useForestAccess } from '../hooks/useForestAccess';
 import { useHolderRanking } from '../hooks/useHolderRanking';
 import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
 import { clearMintCache } from '../services/solana/mintService';
-import { sceneVisualState } from '../utils/sceneVisibility';
+import { formatTokenAmount, uiAmountToRaw } from '../utils/tokenAmount';
+import { sceneActionForAccess, sceneVisualState } from '../utils/sceneVisibility';
 import { logWalletUiReady, markGateIIStart } from '../utils/gateTiming';
+import { resetHolderVerification } from '../utils/walletInteraction';
 import type { ForestScene } from '../types';
 
 export function ForestApp() {
   const reducedMotion = usePrefersReducedMotion();
   const timing = useMemo(() => getCinematicTiming(reducedMotion), [reducedMotion]);
   const access = useForestAccess();
+  const { disconnect } = useWallet();
   const { status, wallet, mint, balance, error, errorDetail, refresh, connecting, authenticate, signing, authIssue } = access;
   const holders = useHolderRanking(mint, status === 'granted');
   const burns = useBurnRanking(mint);
   const [scene, setScene] = useState<ForestScene>('intro');
   const [gateIIVisible, setGateIIVisible] = useState(false);
   const [forestVisible, setForestVisible] = useState(false);
+  const [preferPicker, setPreferPicker] = useState(false);
   const visuals = sceneVisualState(scene);
+
+  const thresholdLabel = mint
+    ? formatTokenAmount(uiAmountToRaw(appConfig.accessThresholdUi, mint.decimals), mint.decimals)
+    : appConfig.accessThresholdUi.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  const deniedBalanceLabel = mint && balance ? formatTokenAmount(balance.totalRaw, mint.decimals) : null;
 
   useEffect(() => {
     console.info(`[MoginHood] MHOOD mint configured: ${formatMintForLog(appConfig.mintAddress)}`);
@@ -53,19 +64,37 @@ export function ForestApp() {
   }, [scene]);
 
   useEffect(() => {
+    if (status === 'awaiting_signature' || status === 'checking' || status === 'granted') {
+      setPreferPicker(false);
+    }
+  }, [status]);
+
+  useEffect(() => {
     if (scene === 'intro' || scene === 'gateDwell') return;
 
-    if (status !== 'granted' || !wallet) {
+    const action = sceneActionForAccess({
+      scene,
+      status,
+      hasWallet: Boolean(wallet),
+    });
+
+    if (action === 'denied') {
       setForestVisible(false);
-      if (scene === 'forest' || scene === 'forestDwell' || scene === 'granted') {
-        setScene('gate');
-      }
+      if (scene === 'denied') return;
+      const hide = window.setTimeout(() => setScene('denied'), timing.walletUiFadeMs);
+      return () => window.clearTimeout(hide);
+    }
+
+    if (action === 'gate') {
+      setForestVisible(false);
+      setScene('gate');
       return;
     }
 
-    if (scene !== 'gate') return;
-    setScene('granted');
-  }, [status, wallet, scene]);
+    if (action === 'granted') {
+      setScene('granted');
+    }
+  }, [status, wallet, scene, timing.walletUiFadeMs]);
 
   useEffect(() => {
     if (scene !== 'granted') return;
@@ -93,6 +122,18 @@ export function ForestApp() {
     setScene((current) => (current === 'intro' ? 'gateDwell' : current));
   }
 
+  function returnToWalletPicker() {
+    resetHolderVerification();
+    setPreferPicker(true);
+    void disconnect();
+  }
+
+  function disconnectDeniedWallet() {
+    resetHolderVerification();
+    setPreferPicker(false);
+    void disconnect();
+  }
+
   return (
     <main className="app-root" style={{ ['--wallet-ui-fade-ms' as string]: `${timing.walletUiFadeMs}ms` }}>
       <BackgroundLayers
@@ -100,6 +141,7 @@ export function ForestApp() {
         reducedMotion={reducedMotion}
         gateIIVisible={gateIIVisible && visuals.gateIIVisible}
         walletUiVisible={visuals.walletUiVisible}
+        denied={visuals.denied}
         forestVisible={forestVisible && visuals.forestBackground}
         blackout={visuals.blackout}
       />
@@ -116,6 +158,8 @@ export function ForestApp() {
 
       <WalletGate
         visible={visuals.showGateUi}
+        preferPicker={preferPicker}
+        leaving={status === 'insufficient' && scene === 'gate'}
         status={status}
         mint={mint}
         balance={balance}
@@ -126,6 +170,14 @@ export function ForestApp() {
         authIssue={authIssue}
         onRetry={() => void refresh()}
         onSign={() => void authenticate()}
+      />
+
+      <AccessDeniedScene
+        visible={visuals.showDenied}
+        balanceLabel={deniedBalanceLabel}
+        thresholdLabel={thresholdLabel}
+        onTryAnotherWallet={returnToWalletPicker}
+        onDisconnect={disconnectDeniedWallet}
       />
 
       {visuals.showGranted ? (

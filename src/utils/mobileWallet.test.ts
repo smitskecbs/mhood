@@ -39,6 +39,15 @@ describe('mobile wallet detection', () => {
 });
 
 describe('official wallet browse links', () => {
+  it('keeps the working Phantom browse universal link unchanged', () => {
+    const encoded = encodeURIComponent(DAPP);
+    expect(buildWalletBrowseUrl('Phantom', DAPP, DAPP)).toBe(
+      `https://phantom.app/ul/browse/${encoded}?ref=${encoded}`,
+    );
+    expect(buildWalletBrowseUrl('Phantom', DAPP, DAPP)).not.toContain('/ul/v1/browse/');
+    expect(buildWalletBrowseUrl('Phantom', DAPP, DAPP)).not.toContain('phantom.app/download');
+  });
+
   it('encodes the live dapp origin for Phantom, Solflare and Backpack browse routes', () => {
     const encoded = encodeURIComponent(DAPP);
     expect(canonicalDappUrl('https://mhood.cbs-coin.com/#gate', DAPP)).toBe(DAPP);

@@ -46,6 +46,7 @@ describe('WalletGate inside a wallet browser', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: /open the gate/i }));
     expect(screen.queryByRole('link', { name: /open in phantom/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /get phantom/i })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /phantom/i }));
     await waitFor(() => {
       expect(select).toHaveBeenCalledWith('Phantom');

@@ -41,10 +41,11 @@ const balance: WalletMhoodBalance = {
 };
 
 describe('WalletGate insufficient balance', () => {
-  it('stays on Gate II and shows the carried balance', () => {
+  it('does not keep the insufficient holder on the Gate II error card', () => {
     render(
       <WalletGate
         visible
+        leaving
         status="insufficient"
         mint={mint}
         balance={balance}
@@ -52,8 +53,10 @@ describe('WalletGate insufficient balance', () => {
         onRetry={() => undefined}
       />,
     );
-    expect(screen.getByText('THE FOREST KNOWS WHAT YOU CARRY.')).toBeInTheDocument();
-    expect(screen.getByText('742,381 / 1,000,000 MHOOD')).toBeInTheDocument();
+    expect(screen.queryByText('THE FOREST REMAINS CLOSED')).not.toBeInTheDocument();
+    expect(screen.queryByText('THE FOREST KNOWS WHAT YOU CARRY.')).not.toBeInTheDocument();
+    expect(screen.queryByText('742,381 / 1,000,000 MHOOD')).not.toBeInTheDocument();
     expect(screen.queryByText('ACCESS GRANTED')).not.toBeInTheDocument();
+    expect(document.querySelector('.gate-shell')).toHaveClass('is-leaving');
   });
 });

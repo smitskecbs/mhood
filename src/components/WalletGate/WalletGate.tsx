@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletReadyState, type WalletName } from '@solana/wallet-adapter-base';
-import { appConfig } from '../../config/env';
 import { COPY } from '../../config/constants';
 import {
   formatWalletConnectError,
@@ -16,7 +15,6 @@ import {
   detectMobileWalletContext,
   WALLET_INSTALL_URLS,
 } from '../../utils/mobileWallet';
-import { formatTokenAmount, uiAmountToRaw } from '../../utils/tokenAmount';
 import { useWalletUi } from '../../app/walletUiContext';
 import { devLog } from '../../utils/devLog';
 import {
@@ -34,6 +32,8 @@ import type { AccessStatus, MintDetails, WalletMhoodBalance } from '../../types'
 
 type WalletGateProps = {
   visible: boolean;
+  preferPicker?: boolean;
+  leaving?: boolean;
   status: AccessStatus;
   mint: MintDetails | null;
   balance: WalletMhoodBalance | null;
@@ -48,9 +48,9 @@ type WalletGateProps = {
 
 export function WalletGate({
   visible,
+  preferPicker = false,
+  leaving = false,
   status,
-  mint,
-  balance,
   error,
   errorDetail = null,
   connecting = false,
@@ -59,9 +59,9 @@ export function WalletGate({
   onRetry,
   onSign,
 }: WalletGateProps) {
-  const { connected, disconnect, publicKey, select, connect, wallets, wallet } = useWallet();
+  const { connected, publicKey, select, connect, wallets, wallet } = useWallet();
   const { connectError, clearConnectError } = useWalletUi();
-  const [phase, setPhase] = useState<WalletFlowPhase>('idle');
+  const [phase, setPhase] = useState<WalletFlowPhase>(preferPicker ? 'wallet-picker' : 'idle');
   const [pickError, setPickError] = useState<string | null>(null);
   const walletContext = detectMobileWalletContext();
   const dappUrl = canonicalDappUrl();
@@ -98,10 +98,14 @@ export function WalletGate({
 
   useEffect(() => {
     if (connected && publicKey) return;
+    if (preferPicker) {
+      setPhase((current) => reduceWalletFlow(current, { type: 'open-picker' }));
+      return;
+    }
     if (status === 'disconnected') {
       setPhase((current) => (current === 'wallet-picker' || current === 'connecting' ? current : 'idle'));
     }
-  }, [connected, publicKey, status]);
+  }, [connected, publicKey, status, preferPicker]);
 
   useEffect(() => {
     if (authIssue === 'rejected' || authIssue === 'invalid') {
@@ -120,15 +124,6 @@ export function WalletGate({
   }, [visible, signEnabled]);
 
   if (!visible) return null;
-
-  const thresholdLabel = mint
-    ? formatTokenAmount(uiAmountToRaw(appConfig.accessThresholdUi, mint.decimals), mint.decimals)
-    : appConfig.accessThresholdUi.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-
-  const carried =
-    mint && balance
-      ? `${formatTokenAmount(balance.totalRaw, mint.decimals)} / ${thresholdLabel} MHOOD`
-      : null;
 
   function openPicker() {
     markInteractionClick();
@@ -230,11 +225,12 @@ export function WalletGate({
 
   return (
     <div
-      className="gate-shell is-interactive"
+      className={`gate-shell is-interactive${leaving ? ' is-leaving' : ''}`}
       data-wallet-interactive="true"
       data-wallet-visible="true"
+      data-wallet-centered="true"
     >
-      <div className="gate-card">
+      <div className="gate-card" data-testid="wallet-gate-card">
         <p className="gate-kicker">Gate II</p>
         <h1 className="gate-title">{showProve ? COPY.proveClaim : COPY.gateLine}</h1>
 
@@ -320,16 +316,6 @@ export function WalletGate({
 
         {connected && status === 'granted' ? (
           <p className="gate-status">The forest opens…</p>
-        ) : null}
-
-        {connected && status === 'insufficient' && carried ? (
-          <div className="gate-denied">
-            <p className="gate-whisper">{COPY.insufficient}</p>
-            <p className="gate-balance">{carried}</p>
-            <button type="button" className="forest-button forest-button--ghost" onClick={() => void disconnect()}>
-              Close the gate
-            </button>
-          </div>
         ) : null}
 
         {connected && status === 'error' ? (

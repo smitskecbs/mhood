@@ -57,6 +57,25 @@ describe('BackgroundLayers', () => {
     expect(container.querySelector('[data-testid="gate2-atmosphere"]')).toBeNull();
   });
 
+  it('shows background1 for the denied scene without blackout or Gate II', () => {
+    const { container } = render(
+      <BackgroundLayers
+        introActive={false}
+        gateIIVisible={false}
+        walletUiVisible={false}
+        denied
+        forestVisible={false}
+      />,
+    );
+    expect(container.querySelector('.scene-stack')?.classList.contains('is-denied')).toBe(true);
+    expect(container.querySelector('.scene-stack')?.classList.contains('is-blackout')).toBe(false);
+    expect(container.querySelector('.scene-bg--gate-i')?.classList.contains('is-visible')).toBe(true);
+    expect(container.querySelector('.scene-bg--gate-ii')?.classList.contains('is-visible')).toBe(false);
+    expect(container.querySelector('.scene-bg--gate-i-ghost')?.classList.contains('is-visible')).toBe(false);
+    expect(container.querySelector('.scene-dimmer')?.classList.contains('is-denied')).toBe(true);
+    expect(container.querySelector('.scene-dimmer')?.classList.contains('is-visible')).toBe(true);
+  });
+
   it('disables glitch animation and Gate II particles when reduced motion is preferred', () => {
     const { container } = render(
       <BackgroundLayers introActive gateIIVisible forestVisible={false} reducedMotion />,

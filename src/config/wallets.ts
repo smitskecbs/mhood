@@ -18,8 +18,12 @@ export function resolveWalletClickAction(input: {
   inWalletBrowser?: boolean;
 }): WalletClickAction {
   if (input.alreadyConnected) return 'noop';
-  if (input.inWalletBrowser || isWalletReadyForPopup(input.readyState)) return 'connect';
+  // Already inside Phantom/Backpack/Solflare: use the injected provider. Never re-offer a deeplink.
+  if (input.inWalletBrowser) return 'connect';
+  // Mobile Safari/Chrome: always open the official in-app browse UL, even if an adapter
+  // reports Loadable (Solflare does this and would otherwise send users to /download).
   if (input.mobile) return 'open-in-wallet';
+  if (isWalletReadyForPopup(input.readyState)) return 'connect';
   return 'install';
 }
 

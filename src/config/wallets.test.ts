@@ -88,6 +88,17 @@ describe('wallet click connect', () => {
     ).toBe('open-in-wallet');
   });
 
+  it('offers a browse deep link on mobile even when the adapter is Loadable', () => {
+    expect(
+      resolveWalletClickAction({
+        readyState: WalletReadyState.Loadable,
+        alreadyConnected: false,
+        mobile: true,
+        inWalletBrowser: false,
+      }),
+    ).toBe('open-in-wallet');
+  });
+
   it('connects normally once the dapp is already inside a wallet browser', () => {
     expect(
       resolveWalletClickAction({

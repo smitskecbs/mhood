@@ -7,6 +7,7 @@ type BackgroundLayersProps = {
   forestVisible: boolean;
   introActive: boolean;
   walletUiVisible?: boolean;
+  denied?: boolean;
   blackout?: boolean;
   reducedMotion?: boolean;
 };
@@ -33,22 +34,25 @@ export function BackgroundLayers({
   forestVisible,
   introActive,
   walletUiVisible = false,
+  denied = false,
   blackout = false,
   reducedMotion = false,
 }: BackgroundLayersProps) {
-  const cinematicActive = !blackout && gateIIVisible && !forestVisible && !reducedMotion;
+  const cinematicActive = !blackout && gateIIVisible && !forestVisible && !reducedMotion && !denied;
   const living = cinematicActive && !walletUiVisible;
   const phase = useGateIICinematic(living);
   const displayPhase = cinematicActive && walletUiVisible ? 'rest' : phase;
   const flicker = !blackout && introActive && !reducedMotion;
   const glitch = !blackout && (introActive || living) && !reducedMotion;
+  const dimmerVisible = !blackout && !forestVisible && (walletUiVisible || denied);
 
   return (
     <div
-      className={`scene-stack ${blackout ? 'is-blackout' : ''} ${cinematicActive ? `gate2-${displayPhase}` : ''}`.trim()}
+      className={`scene-stack ${blackout ? 'is-blackout' : ''} ${denied ? 'is-denied' : ''} ${cinematicActive ? `gate2-${displayPhase}` : ''}`.trim()}
       aria-hidden="true"
       data-pointer-events="none"
       data-gate2-phase={cinematicActive ? displayPhase : undefined}
+      data-denied={denied ? 'true' : undefined}
     >
       <FittedSceneBackground
         className={`scene-bg--gate-i ${flicker ? 'is-flickering' : ''}`}
@@ -70,7 +74,7 @@ export function BackgroundLayers({
         src={BACKGROUNDS.forest}
         visible={forestVisible && !blackout}
       />
-      <div className={`scene-dimmer ${walletUiVisible && !forestVisible && !blackout ? 'is-visible' : ''}`} />
+      <div className={`scene-dimmer ${dimmerVisible ? 'is-visible' : ''} ${denied ? 'is-denied' : ''}`.trim()} />
       <div className="scene-vignette" />
       <div className={`scene-mist ${cinematicActive ? 'is-living' : ''}`} />
       {cinematicActive ? <GateIIAtmosphere phase={displayPhase} /> : null}

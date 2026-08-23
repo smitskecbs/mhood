@@ -100,7 +100,14 @@ export type AccessStatus =
   | 'granted'
   | 'error';
 
-export type ForestScene = 'intro' | 'gateDwell' | 'gate' | 'granted' | 'forestDwell' | 'forest';
+export type ForestScene =
+  | 'intro'
+  | 'gateDwell'
+  | 'gate'
+  | 'denied'
+  | 'granted'
+  | 'forestDwell'
+  | 'forest';
 
 export type BurnMode = 'simulation' | 'real';
 

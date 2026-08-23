@@ -26,7 +26,7 @@ vi.mock('@solana/wallet-adapter-react', () => ({
       },
       {
         adapter: { name: 'Solflare', url: 'https://solflare.com', connect: vi.fn() },
-        readyState: 'NotDetected',
+        readyState: 'Loadable',
       },
     ],
   }),
@@ -68,11 +68,12 @@ describe('WalletGate mobile browse links', () => {
     const phantom = screen.getByRole('link', { name: 'Open in Phantom' });
     const solflare = screen.getByRole('link', { name: 'Open in Solflare' });
 
-    expect(backpack).toHaveAttribute('href', `https://backpack.app/ul/v1/browse/${encoded}?ref=${encoded}`);
     expect(phantom).toHaveAttribute('href', `https://phantom.app/ul/browse/${encoded}?ref=${encoded}`);
+    expect(backpack).toHaveAttribute('href', `https://backpack.app/ul/v1/browse/${encoded}?ref=${encoded}`);
     expect(solflare).toHaveAttribute('href', `https://solflare.com/ul/v1/browse/${encoded}?ref=${encoded}`);
     expect(backpack.getAttribute('href')).toContain(encoded);
     expect(phantom.getAttribute('href')).not.toContain('phantom.app/download');
+    expect(solflare.getAttribute('href')).not.toContain('solflare.com/download');
     expect(select).not.toHaveBeenCalled();
     expect(connect).not.toHaveBeenCalled();
     expect(screen.getByRole('link', { name: 'Get Backpack' })).toBeInTheDocument();
