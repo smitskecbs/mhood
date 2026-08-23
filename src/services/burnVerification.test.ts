@@ -128,6 +128,18 @@ describe('burn verification', () => {
     expect(record.amountUi).toBe('1');
   });
 
+  it('stores the on-chain BurnChecked amount for a single 5 MHOOD signature', () => {
+    const record = extractVerifiedMhoodBurnRecord({
+      signature: 'treasury-five',
+      parsed: { slot: 2, blockTime: 2, ...parsedBurn('5000000') },
+      mint,
+      decimals: 6,
+    });
+    expect(record.amountRaw).toBe('5000000');
+    expect(record.amountUi).toBe('5');
+    expect(record.wallet).toBe(wallet);
+  });
+
   it('rejects a BurnChecked for the wrong mint', () => {
     expect(() =>
       extractVerifiedMhoodBurnRecord({

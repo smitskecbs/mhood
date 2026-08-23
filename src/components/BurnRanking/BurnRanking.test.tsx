@@ -52,6 +52,8 @@ describe('BurnRanking', () => {
     expect(screen.getByTestId('burn-ranking-mobile')).toHaveTextContent('2 MHOOD · 2 burns');
     expect(screen.getByTestId('burn-ranking-mobile')).toHaveTextContent('Last burn:');
     expect(screen.queryByText('BurnerWallet1111111111111111111111111')).not.toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Total Burned' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Burns' })).toBeInTheDocument();
   });
 
   it('says production burn history is not stored yet when persistence is inactive', () => {

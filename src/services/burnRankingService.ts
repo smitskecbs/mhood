@@ -76,6 +76,16 @@ export class IndexerBurnRankingProvider implements BurnRankingProvider {
   }
 }
 
+export function compareBurnRankingEntries(
+  a: Pick<BurnRankingEntry, 'totalBurnedRaw' | 'burns' | 'wallet'>,
+  b: Pick<BurnRankingEntry, 'totalBurnedRaw' | 'burns' | 'wallet'>,
+): number {
+  const burned = compareRawDesc(BigInt(a.totalBurnedRaw), BigInt(b.totalBurnedRaw));
+  if (burned !== 0) return burned;
+  if (a.burns !== b.burns) return b.burns - a.burns;
+  return a.wallet.localeCompare(b.wallet);
+}
+
 export function aggregateBurnRecords(records: BurnRecord[], decimals: number): BurnRankingSnapshot {
   const byWallet = new Map<string, { total: bigint; burns: number; lastBurn: number | null }>();
   let totalBurned = 0n;
@@ -109,10 +119,7 @@ export function aggregateBurnRecords(records: BurnRecord[], decimals: number): B
       lastBurn: stats.lastBurn,
       label: projectWalletLabel(wallet) ?? undefined,
     }))
-    .sort((a, b) => {
-      const cmp = compareRawDesc(BigInt(a.totalBurnedRaw), BigInt(b.totalBurnedRaw));
-      return cmp !== 0 ? cmp : a.wallet.localeCompare(b.wallet);
-    })
+    .sort(compareBurnRankingEntries)
     .map((entry, index) => ({ ...entry, rank: index + 1 }));
 
   const source: RankingSourceKind = uniqueRecords.length === 0 ? 'none' : 'local';
