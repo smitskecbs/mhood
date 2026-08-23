@@ -46,4 +46,4 @@ export type ForestUiStage = (typeof FOREST_UI_STAGES)[number];
 export const HOLDER_RANKING_CACHE_MS = 5 * 60 * 1000;
 export const HOLDER_RANKING_PAGE_SIZE = 1000;
 export const HOLDER_RANKING_MAX_PAGES = 80;
-export const HOLDER_RANKING_VISIBLE_TOP = 100;
+export const HOLDER_RANKING_VISIBLE_TOP = 20;

@@ -2,6 +2,7 @@ import { COPY } from '../../config/constants';
 import { HOLDER_RANKING_VISIBLE_TOP } from '../../config/timing';
 import { shortenAddress } from '../../utils/format';
 import { findWalletRankingEntry } from '../../utils/holderAggregation';
+import { shouldShowYourPositionCard, visibleCommunityLeaderboard } from '../../utils/holderPresentation';
 import type { HolderRankingSnapshot } from '../../types';
 import { ForestPanel } from '../layout/ForestPanel';
 
@@ -20,9 +21,9 @@ export function HolderRanking({
   currentWallet,
   onRetry,
 }: HolderRankingProps) {
-  const visible = (snapshot?.entries ?? []).slice(0, HOLDER_RANKING_VISIBLE_TOP);
+  const visible = visibleCommunityLeaderboard(snapshot?.entries ?? [], HOLDER_RANKING_VISIBLE_TOP);
   const you = findWalletRankingEntry(snapshot, currentWallet);
-  const showYouOutsideTop = Boolean(you && !visible.some((entry) => entry.wallet === you.wallet));
+  const showYouOutsideTop = shouldShowYourPositionCard(visible, you);
 
   return (
     <ForestPanel eyebrow="Those who remain" title={COPY.holdersTitle}>
@@ -41,6 +42,7 @@ export function HolderRanking({
       ) : null}
       {!loading && !error && snapshot ? (
         <>
+          <p className="holders-caption">{COPY.holdersTopCaption}</p>
           <div className="table-scroll">
             <table className="forest-table">
               <thead>
@@ -77,11 +79,12 @@ export function HolderRanking({
             ))}
           </ol>
           {showYouOutsideTop && you ? (
-            <div className="your-position">
+            <div className="your-position" data-testid="your-position">
               <p className="forest-panel__eyebrow">{COPY.yourPosition}</p>
-              <p className="your-position__row">
-                #{you.rank} {shortenAddress(you.wallet, 3)} {you.balanceUi} MHOOD
-              </p>
+              <p className="your-position__rank">#{you.rank}</p>
+              <p className="your-position__wallet">{shortenAddress(you.wallet, 4)}</p>
+              <p className="your-position__amount">{you.balanceUi} MHOOD</p>
+              <p className="your-position__pct">{you.supplyPercent}</p>
             </div>
           ) : null}
         </>

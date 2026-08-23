@@ -838,9 +838,25 @@ a.wallet-picker__button {
   border-top: 1px solid rgba(198, 214, 176, 0.12);
 }
 
+.your-position__rank,
+.your-position__wallet,
+.your-position__amount,
+.your-position__pct,
 .your-position__row {
-  margin: 6px 0 0;
+  margin: 4px 0 0;
   color: var(--moss-strong);
+  overflow-wrap: anywhere;
+}
+
+.your-position__rank {
+  font-family: var(--serif);
+  font-size: 1.15rem;
+}
+
+.holders-caption {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 0.85rem;
 }
 
 .forest-stage {

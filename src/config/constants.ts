@@ -39,6 +39,7 @@ export const COPY = {
   legendsIndexedIncomplete:
     'Forest Legends shows verified indexed burns. Global Total Burned comes from on-chain supply.',
   yourPosition: 'Your position',
+  holdersTopCaption: 'Showing Top 20 community holders',
   burnTitle: 'THE BURNING GROVE',
   burnPrompt: 'Choose what you are willing to return to the forest.',
   burnConfirmTitle: 'RETURN TO THE FOREST',

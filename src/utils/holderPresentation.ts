@@ -71,6 +71,20 @@ export function findCommunityWalletRank(presentation: HolderPresentation, wallet
   return presentation.communityEntries.find((entry) => entry.wallet === wallet)?.rank ?? null;
 }
 
+export function visibleCommunityLeaderboard(
+  entries: HolderRankingEntry[],
+  limit = 20,
+): HolderRankingEntry[] {
+  return entries.slice(0, limit);
+}
+
+export function shouldShowYourPositionCard(
+  visible: HolderRankingEntry[],
+  you: HolderRankingEntry | null | undefined,
+): boolean {
+  return Boolean(you && !visible.some((entry) => entry.wallet === you.wallet));
+}
+
 export function projectWalletLabel(address: string): string | null {
   return findProjectWallet(address)?.label ?? null;
 }

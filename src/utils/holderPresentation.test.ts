@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { PROJECT_WALLETS } from '../config/projectWallets';
-import { findCommunityWalletRank, presentHolderRanking } from './holderPresentation';
-import type { HolderRankingSnapshot } from '../types';
+import {
+  findCommunityWalletRank,
+  presentHolderRanking,
+  shouldShowYourPositionCard,
+  visibleCommunityLeaderboard,
+} from './holderPresentation';
+import type { HolderRankingEntry, HolderRankingSnapshot } from '../types';
 
 const supplyRaw = 1_000_000_000_000_000n;
 
@@ -56,6 +61,16 @@ const snapshot: HolderRankingSnapshot = {
   ],
 };
 
+function communityEntry(rank: number, wallet: string, balanceRaw: string): HolderRankingEntry {
+  return {
+    rank,
+    wallet,
+    balanceRaw,
+    balanceUi: balanceRaw,
+    supplyPercent: '0.01%',
+  };
+}
+
 describe('holder presentation', () => {
   it('filters project wallets from community rank without dropping their balances', () => {
     const presented = presentHolderRanking(snapshot, 6, supplyRaw);
@@ -79,5 +94,36 @@ describe('holder presentation', () => {
     expect(presented.projectAllocations.find((entry) => entry.id === 'treasury')?.balanceRaw).toBe(
       '500000000000000',
     );
+  });
+
+  it('keeps the full community list for ranks and tokenomics when the leaderboard shows Top 20', () => {
+    const community = Array.from({ length: 48 }, (_, index) =>
+      communityEntry(
+        index + 2,
+        `Community${(index + 1).toString().padStart(2, '0')}111111111111111111111111`,
+        String((48 - index) * 1_000_000),
+      ),
+    );
+    const presented = presentHolderRanking(
+      {
+        ...snapshot,
+        entries: [snapshot.entries[0]!, ...community, snapshot.entries[5]!],
+      },
+      6,
+      supplyRaw,
+    );
+    expect(presented.onChainEntries).toHaveLength(50);
+    expect(presented.communityEntries).toHaveLength(48);
+    expect(presented.communityHolderCount).toBe(48);
+    expect(presented.communityHeldRaw).toBe(
+      community.reduce((total, entry) => total + BigInt(entry.balanceRaw), 0n),
+    );
+    const visible = visibleCommunityLeaderboard(presented.communityEntries);
+    expect(visible).toHaveLength(20);
+    expect(visible.map((entry) => entry.rank)).toEqual(Array.from({ length: 20 }, (_, index) => index + 1));
+    expect(visible.some((entry) => entry.rank === 21)).toBe(false);
+    expect(findCommunityWalletRank(presented, community[26]!.wallet)).toBe(27);
+    expect(shouldShowYourPositionCard(visible, presented.communityEntries[26])).toBe(true);
+    expect(shouldShowYourPositionCard(visible, presented.communityEntries[7])).toBe(false);
   });
 });
