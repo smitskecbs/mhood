@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { handleAdminBackfillRequest } from './adminBackfill.js';
+import { handleAdminBackfillRequest, HANDLER_DEADLINE_MS } from './adminBackfill.js';
 import {
   KNOWN_BURNER_WALLET,
   MHOOD_BURN_MINT,
@@ -225,7 +225,7 @@ describe('backfill timeouts and stage errors', () => {
   });
 
   it('logs seed 1 and seed 2 stages and finishes under 10 seconds with mocks', async () => {
-    const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+    const info = vi.spyOn(console, 'log').mockImplementation(() => {});
     const started = Date.now();
     const result = await handleAdminBackfillRequest({
       httpMethod: 'POST',
@@ -246,28 +246,31 @@ describe('backfill timeouts and stage errors', () => {
     const lines = info.mock.calls.map((args) => String(args[0]));
     const backfill = lines.filter((line) => line.startsWith('[MoginHood backfill]'));
     expect(backfill).toEqual(expect.arrayContaining([
-      '[MoginHood backfill] request start',
+      '[MoginHood backfill] parsing request',
+      '[MoginHood backfill] request parsed',
       '[MoginHood backfill] auth ok',
-      '[MoginHood backfill] store selected: memory',
+      '[MoginHood backfill] creating store',
+      '[MoginHood backfill] store created',
+      '[MoginHood backfill] store health start',
       '[MoginHood backfill] store health ok',
       '[MoginHood backfill] seed count: 2',
-      '[MoginHood backfill] seed 1 start',
-      '[MoginHood backfill] checking existing record',
-      '[MoginHood backfill] existing check complete: false',
-      '[MoginHood backfill] requesting transaction from Helius',
-      '[MoginHood backfill] transaction received',
-      '[MoginHood backfill] verifying burn',
-      '[MoginHood backfill] verification success',
-      '[MoginHood backfill] writing record to store',
-      '[MoginHood backfill] store write complete',
+      '[MoginHood backfill] seed 1 existing read start',
+      '[MoginHood backfill] seed 1 existing read complete',
+      '[MoginHood backfill] seed 1 helius start',
+      '[MoginHood backfill] seed 1 helius complete',
+      '[MoginHood backfill] seed 1 verify complete',
+      '[MoginHood backfill] seed 1 write start',
+      '[MoginHood backfill] seed 1 write complete',
       '[MoginHood backfill] seed 1 complete',
-      '[MoginHood backfill] seed 2 start',
+      '[MoginHood backfill] seed 2 existing read start',
+      '[MoginHood backfill] seed 2 write complete',
       '[MoginHood backfill] seed 2 complete',
     ]));
     expect(backfill.some((line) => line.startsWith('[MoginHood backfill] complete'))).toBe(true);
     expect(backfill.join('\n')).not.toMatch(/forest-secret|kv-write-token|HELIUS_RPC_URL/);
     expect(info.mock.calls.flat().join('\n')).not.toContain(HELIUS_URL);
     expect(UPSTASH_TIMEOUT_MS).toBe(5_000);
+    expect(HANDLER_DEADLINE_MS).toBe(20_000);
   });
 
   it('does not scan history during a successful mocked seed', async () => {
@@ -300,5 +303,28 @@ describe('backfill timeouts and stage errors', () => {
     });
     await verifyBurnStoreHealth(store);
     expect(commands).toEqual([['HGET', VERIFIED_BURNS_REDIS_KEY, BURN_STORE_HEALTH_FIELD]]);
+  });
+
+  it('returns JSON handler-timeout before Vercel can kill the isolate', async () => {
+    class HangStore extends MemoryVerifiedBurnStore {
+      async health(): Promise<void> {
+        await new Promise(() => {});
+      }
+    }
+    const started = Date.now();
+    const result = await handleAdminBackfillRequest({
+      httpMethod: 'POST',
+      headers: { authorization: 'Bearer forest-secret' },
+      env: authorizedEnv,
+      store: new HangStore(),
+      deadlineMs: 80,
+    });
+    expect(Date.now() - started).toBeLessThan(2_000);
+    expect(result.status).toBe(503);
+    expect(result.body).toEqual({
+      ok: false,
+      stage: 'handler-timeout',
+      error: 'Backfill exceeded 1 second deadline',
+    });
   });
 });

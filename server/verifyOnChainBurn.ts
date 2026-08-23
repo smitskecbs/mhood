@@ -19,11 +19,12 @@ export async function fetchParsedBurnTransaction(
   fetchImpl: typeof fetch = fetch,
   timeoutMs?: number,
   onResponse?: (status: number, durationMs: number) => void,
+  signal?: AbortSignal,
 ): Promise<ParsedBurnTransaction | null> {
   return heliusRpc<ParsedBurnTransaction | null>(
     'getTransaction',
     [signature, { encoding: 'jsonParsed', maxSupportedTransactionVersion: 0, commitment: 'confirmed' }],
-    { rpcUrl, fetchImpl, timeoutMs, onResponse },
+    { rpcUrl, fetchImpl, timeoutMs, onResponse, signal },
   );
 }
 

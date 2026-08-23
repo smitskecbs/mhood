@@ -10,7 +10,7 @@
       "maxDuration": 30
     },
     "api/admin/backfill-burns.ts": {
-      "maxDuration": 60
+      "maxDuration": 30
     }
   }
 }

@@ -11,6 +11,9 @@ export async function fetchJsonWithTimeout(
   timeoutMs: number,
   timeoutMessage: string,
 ): Promise<{ ok: boolean; status: number; payload: unknown }> {
+  if (init.signal?.aborted) {
+    throw new Error(timeoutMessage);
+  }
   const controller = new AbortController();
   const onOuterAbort = () => controller.abort();
   init.signal?.addEventListener('abort', onOuterAbort);

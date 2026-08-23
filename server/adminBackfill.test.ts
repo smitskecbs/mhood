@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { handleAdminBackfillRequest } from './adminBackfill.js';
 import {
   KNOWN_BURNER_WALLET,
@@ -152,6 +152,44 @@ describe('admin burn backfill HTTP-only runtime', () => {
     const response = await mod.GET();
     expect(response.status).toBe(404);
     await expect(response.json()).resolves.toEqual({ error: 'Not found' });
+  });
+
+  it('imports the admin function with zero network calls', async () => {
+    const fetchSpy = vi.fn();
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    try {
+      const started = Date.now();
+      await import('../api/admin/backfill-burns.js');
+      expect(Date.now() - started).toBeLessThan(500);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it('logs request start as the first POST statement before parsing the body', async () => {
+    const { POST } = await import('../api/admin/backfill-burns.js');
+    const logs: string[] = [];
+    const spy = vi.spyOn(console, 'log').mockImplementation((message: unknown) => {
+      logs.push(String(message));
+    });
+    try {
+      await POST(new Request('http://localhost/api/admin/backfill-burns', { method: 'POST' }));
+      expect(logs[0]).toBe('[MoginHood backfill] request start');
+      expect(logs[1]).toBe('[MoginHood backfill] parsing request');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('creates the store lazily inside the handler, not at module scope', () => {
+    const admin = readFileSync(path.resolve(process.cwd(), 'api/admin/backfill-burns.ts'), 'utf8');
+    expect(admin).toMatch(/export async function POST/);
+    expect(admin).toMatch(/console\.log\('\[MoginHood backfill\] request start'\)/);
+    expect(admin).not.toMatch(/^const store = createVerifiedBurnStore/m);
+    expect(admin).not.toMatch(/createVerifiedBurnStore/);
+    expect(admin).not.toMatch(/^await /m);
   });
 
   it('GET does not crash the function', async () => {

@@ -9,6 +9,7 @@ export async function solanaJsonRpc<T>(
   fetchImpl: typeof fetch = fetch,
   timeoutMs: number = RPC_TIMEOUT_MS,
   onResponse?: (status: number, durationMs: number) => void,
+  signal?: AbortSignal,
 ): Promise<T> {
   const started = Date.now();
   const timeoutMessage = `RPC ${method} timed out`;
@@ -19,6 +20,7 @@ export async function solanaJsonRpc<T>(
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+      signal,
     },
     timeoutMs,
     timeoutMessage,
@@ -39,6 +41,7 @@ export async function heliusRpc<T>(
     fetchImpl?: typeof fetch;
     timeoutMs?: number;
     onResponse?: (status: number, durationMs: number) => void;
+    signal?: AbortSignal;
   },
 ): Promise<T> {
   const rpcUrl = (options?.rpcUrl ?? process.env.HELIUS_RPC_URL ?? '').trim();
@@ -52,5 +55,6 @@ export async function heliusRpc<T>(
     options?.fetchImpl ?? fetch,
     options?.timeoutMs ?? RPC_TIMEOUT_MS,
     options?.onResponse,
+    options?.signal,
   );
 }

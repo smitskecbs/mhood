@@ -202,6 +202,7 @@ export async function executeUpstashCommand(
   command: string[],
   fetchImpl: typeof fetch = fetch,
   timeoutMs: number = UPSTASH_TIMEOUT_MS,
+  signal?: AbortSignal,
 ): Promise<unknown> {
   const op = (command[0] ?? '').toUpperCase();
   const timeoutMessage =
@@ -217,6 +218,7 @@ export async function executeUpstashCommand(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(command),
+      signal,
     },
     timeoutMs,
     timeoutMessage,
@@ -236,11 +238,12 @@ export function createUpstashVerifiedBurnStore(
   env: NodeJS.Dict<string>,
   fetchImpl: typeof fetch = fetch,
   timeoutMs: number = UPSTASH_TIMEOUT_MS,
+  signal?: AbortSignal,
 ): UpstashVerifiedBurnStore | null {
   const credentials = readUpstashCredentials(env);
   if (!credentials) return null;
   logSelectedCredentials(credentials);
   return new UpstashVerifiedBurnStore((command) =>
-    executeUpstashCommand(credentials, command, fetchImpl, timeoutMs),
+    executeUpstashCommand(credentials, command, fetchImpl, timeoutMs, signal),
   );
 }

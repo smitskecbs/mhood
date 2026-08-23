@@ -51,6 +51,7 @@ export async function backfillSeedSignatures(input: {
   fetchImpl?: typeof fetch;
   timeoutMs?: number;
   verify?: (signature: string) => Promise<BurnRecord>;
+  signal?: AbortSignal;
 }): Promise<SeedBackfillResult> {
   const signatures = uniqueSignatures(input.signatures ?? KNOWN_MHOOD_BURN_SIGNATURES);
   const expectedWallet = input.expectedWallet ?? KNOWN_BURNER_WALLET;
@@ -62,19 +63,18 @@ export async function backfillSeedSignatures(input: {
 
   for (let index = 0; index < signatures.length; index += 1) {
     const signature = signatures[index]!;
-    const seedLabel = `seed ${index + 1}`;
-    backfillLog(`${seedLabel} start`);
-    backfillLog('checking existing record');
+    const seed = `seed ${index + 1}`;
+    backfillLog(`${seed} existing read start`);
     let existing: BurnRecord | null;
     try {
       existing = await input.store.get(signature);
     } catch (err) {
       throw asStageError(err, 'store-read', 502);
     }
-    backfillLog(`existing check complete: ${Boolean(existing)}`);
+    backfillLog(`${seed} existing read complete`);
     if (existing) {
       alreadyIndexedSignatures.push(signature);
-      backfillLog(`${seedLabel} complete`);
+      backfillLog(`${seed} complete`);
       continue;
     }
 
@@ -83,7 +83,7 @@ export async function backfillSeedSignatures(input: {
       if (input.verify) {
         record = await input.verify(signature);
       } else {
-        backfillLog('requesting transaction from Helius');
+        backfillLog(`${seed} helius start`);
         let parsed;
         try {
           parsed = await fetchParsedBurnTransaction(
@@ -91,18 +91,17 @@ export async function backfillSeedSignatures(input: {
             signature,
             input.fetchImpl,
             input.timeoutMs,
-            (status, durationMs) => {
-              backfillLog(`helius response status=${status} durationMs=${durationMs}`);
+            (_status, durationMs) => {
+              backfillLog(`${seed} helius complete`, { durationMs });
             },
+            input.signal,
           );
         } catch (err) {
           throw asStageError(err, 'helius-rpc', 502);
         }
-        backfillLog('transaction received');
         if (!parsed) {
           throw new Error('The forest could not confirm the burn.');
         }
-        backfillLog('verifying burn');
         record = extractVerifiedMhoodBurnRecord({
           signature,
           parsed,
@@ -110,17 +109,17 @@ export async function backfillSeedSignatures(input: {
           decimals: MHOOD_BURN_DECIMALS,
           expectedWallet,
         });
-        backfillLog('verification success');
+        backfillLog(`${seed} verify complete`);
       }
 
-      backfillLog('writing record to store');
+      backfillLog(`${seed} write start`);
       let saved: { record: BurnRecord; added: boolean };
       try {
         saved = await input.store.add(record);
       } catch (err) {
         throw asStageError(err, 'store-write', 502);
       }
-      backfillLog('store write complete');
+      backfillLog(`${seed} write complete`);
       if (saved.added) records.push(saved.record);
       else alreadyIndexedSignatures.push(signature);
     } catch (err) {
@@ -130,7 +129,7 @@ export async function backfillSeedSignatures(input: {
         reason: err instanceof Error ? err.message : 'Rejected burn candidate',
       });
     }
-    backfillLog(`${seedLabel} complete`);
+    backfillLog(`${seed} complete`);
   }
 
   const inserted = records.length;

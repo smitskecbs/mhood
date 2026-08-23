@@ -5,20 +5,28 @@ export const config = {
   maxDuration: 30,
 };
 
-async function readJsonBody(request: Request): Promise<unknown> {
-  try {
-    return await request.json();
-  } catch {
-    return null;
-  }
+function isWebRequest(value: unknown): value is Request {
+  return Boolean(
+    value &&
+      typeof value === 'object' &&
+      typeof (value as Request).json === 'function' &&
+      typeof (value as Request).arrayBuffer === 'function',
+  );
 }
 
+type NodeResponse = {
+  statusCode: number;
+  setHeader: (name: string, value: string) => void;
+  end: (chunk?: string) => void;
+};
+
 export async function POST(request: Request): Promise<Response> {
+  console.log('[MoginHood backfill] request start');
   try {
     const result = await handleAdminBackfillRequest({
       httpMethod: 'POST',
       headers: request.headers,
-      body: await readJsonBody(request),
+      request,
       env: process.env,
     });
     return Response.json(result.body, { status: result.status });
@@ -29,13 +37,30 @@ export async function POST(request: Request): Promise<Response> {
 }
 
 export async function GET(): Promise<Response> {
-  const result = await handleAdminBackfillRequest({
-    httpMethod: 'GET',
-    env: process.env,
-  });
-  return Response.json(result.body, { status: result.status });
+  return Response.json({ error: 'Not found' }, { status: 404 });
 }
 
-export default async function handler(request: Request): Promise<Response> {
-  return request.method === 'POST' ? POST(request) : GET();
+export default async function handler(
+  request: Request | { method?: string; headers?: IncomingHeaders; body?: unknown },
+  response?: NodeResponse,
+): Promise<Response | void> {
+  if (isWebRequest(request)) {
+    return request.method === 'POST' ? POST(request) : GET();
+  }
+  console.log('[MoginHood backfill] request start');
+  if (response && typeof response.end === 'function') {
+    const result = await handleAdminBackfillRequest({
+      httpMethod: request.method === 'POST' ? 'POST' : 'GET',
+      headers: request.headers,
+      body: null,
+      env: process.env,
+    });
+    response.statusCode = result.status;
+    response.setHeader('Content-Type', 'application/json');
+    response.end(JSON.stringify(result.body));
+    return;
+  }
+  return GET();
 }
+
+type IncomingHeaders = Headers | Record<string, string | string[] | undefined>;
