@@ -24,6 +24,36 @@ describe('BurnRanking', () => {
     expect(screen.queryByText(/Development data/)).not.toBeInTheDocument();
   });
 
+  it('renders compact mobile ranking rows beside the desktop table', () => {
+    render(
+      <BurnRanking
+        snapshot={{
+          ...empty,
+          persistence: 'persistent',
+          live: true,
+          entries: [
+            {
+              rank: 1,
+              wallet: 'BurnerWallet1111111111111111111111111',
+              totalBurnedRaw: '2000000',
+              totalBurnedUi: '2',
+              burns: 2,
+              lastBurn: 1_700_000_000,
+            },
+          ],
+        }}
+        loading={false}
+        error={null}
+        currentWallet={null}
+      />,
+    );
+    expect(screen.getByTestId('burn-ranking-mobile')).toHaveTextContent('#1');
+    expect(screen.getByTestId('burn-ranking-mobile')).toHaveTextContent('Burn...1111');
+    expect(screen.getByTestId('burn-ranking-mobile')).toHaveTextContent('2 MHOOD · 2 burns');
+    expect(screen.getByTestId('burn-ranking-mobile')).toHaveTextContent('Last burn:');
+    expect(screen.queryByText('BurnerWallet1111111111111111111111111')).not.toBeInTheDocument();
+  });
+
   it('says production burn history is not stored yet when persistence is inactive', () => {
     render(
       <BurnRanking

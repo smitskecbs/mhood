@@ -708,6 +708,8 @@ a.wallet-picker__button {
   position: relative;
   z-index: 2;
   width: min(1180px, calc(100% - 28px));
+  max-width: 100%;
+  min-width: 0;
   margin: 0 auto;
   padding: 88px 0 72px;
   display: grid;
@@ -720,6 +722,9 @@ a.wallet-picker__button {
 }
 
 .forest-panel {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   padding: 22px;
   background: var(--panel);
   border: 1px solid var(--panel-border);
@@ -747,6 +752,17 @@ a.wallet-picker__button {
   grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 14px;
   margin-bottom: 16px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.wallet-summary__grid > *,
+.stats-grid > * {
+  min-width: 0;
+}
+
+.stat-value {
+  overflow-wrap: anywhere;
 }
 
 .stats-grid {
@@ -766,16 +782,29 @@ a.wallet-picker__button {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 20px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.forest-columns > * {
+  min-width: 0;
 }
 
 .table-scroll {
   overflow-x: auto;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .forest-table {
   width: 100%;
   border-collapse: collapse;
   min-width: 420px;
+}
+
+.ranking-cards,
+.allocation-cards {
+  display: none;
 }
 
 .forest-table th,
@@ -817,6 +846,8 @@ a.wallet-picker__button {
 .forest-stage {
   display: grid;
   gap: 20px;
+  min-width: 0;
+  max-width: 100%;
   opacity: 0;
   transform: translateY(16px);
   filter: blur(6px);
@@ -870,6 +901,8 @@ a.wallet-picker__button {
 
 .burn-input {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   margin-top: 8px;
   padding: 12px 14px;
   border-radius: 14px;
@@ -924,6 +957,8 @@ a.wallet-picker__button {
 
 .modal-card {
   width: min(480px, 100%);
+  max-width: 100%;
+  min-width: 0;
   padding: 24px;
 }
 
@@ -1220,6 +1255,13 @@ a.wallet-picker__button {
 }
 
 @media (max-width: 720px) {
+  html,
+  body,
+  #root,
+  .app-root {
+    max-width: 100%;
+  }
+
   .dev-ribbon {
     top: 8px;
     font-size: 0.62rem;
@@ -1230,8 +1272,12 @@ a.wallet-picker__button {
 
   .wallet-summary__grid,
   .stats-grid,
+  .stats-grid--grove {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .forest-columns {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .gate-shell {
@@ -1301,9 +1347,78 @@ a.wallet-picker__button {
   }
 
   .forest-ui {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
     padding-top: max(72px, env(safe-area-inset-top));
     padding-bottom: max(72px, env(safe-area-inset-bottom));
-    width: min(1180px, calc(100% - 20px));
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+
+  .forest-stage,
+  .forest-panel,
+  .forest-columns,
+  .wallet-summary,
+  .burn-panel {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .table-scroll,
+  .forest-table {
+    display: none;
+  }
+
+  .ranking-cards,
+  .allocation-cards {
+    display: grid;
+    gap: 4px;
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .ranking-card,
+  .allocation-card {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+    max-width: 100%;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(198, 214, 176, 0.12);
+  }
+
+  .ranking-card.is-you,
+  .ranking-card.is-you .ranking-card__amount {
+    color: var(--moss-strong);
+  }
+
+  .ranking-card__rank,
+  .ranking-card__head,
+  .allocation-card__label {
+    font-family: var(--serif);
+    margin: 0;
+  }
+
+  .ranking-card__wallet,
+  .ranking-card__amount,
+  .ranking-card__pct,
+  .ranking-card__meta,
+  .allocation-card__wallet,
+  .allocation-card__amount,
+  .allocation-card__pct {
+    margin: 0;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .ranking-card__meta,
+  .allocation-card__wallet {
+    color: var(--muted);
   }
 
   .forest-panel__title {
@@ -1318,14 +1433,27 @@ a.wallet-picker__button {
 
   .forest-ui .forest-button,
   .modal-actions .forest-button,
-  .ranking-error .forest-button {
+  .ranking-error .forest-button,
+  .percent-row .forest-button {
     min-height: 44px;
   }
 
-  .forest-table th,
-  .forest-table td {
-    font-size: 0.9rem;
-    padding: 12px 8px;
+  .percent-row,
+  .modal-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .percent-row .forest-button,
+  .burn-panel > .forest-button,
+  .modal-actions .forest-button {
+    width: 100%;
+  }
+
+  .mode-pill {
+    max-width: 100%;
+    white-space: normal;
   }
 
   .wallet-label {

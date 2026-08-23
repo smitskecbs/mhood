@@ -37,10 +37,13 @@ describe('TokenDistribution', () => {
     const presentation = presentHolderRanking(snapshot, mint.decimals, mint.supplyRaw);
     render(<TokenDistribution mint={mint} presentation={presentation} />);
     expect(screen.getByText('TOKEN DISTRIBUTION')).toBeInTheDocument();
-    expect(screen.getByText('Treasury')).toBeInTheDocument();
-    expect(screen.getByText('15% Token Lock')).toBeInTheDocument();
-    expect(screen.getByText('Dev Wallet')).toBeInTheDocument();
-    expect(screen.getByText('Presale Site')).toBeInTheDocument();
+    expect(screen.getAllByText('Treasury').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('15% Token Lock').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Dev Wallet').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Presale Site').length).toBeGreaterThan(0);
     expect(screen.getByText('Community-held MHOOD')).toBeInTheDocument();
+    expect(screen.getByTestId('token-distribution-mobile')).toBeInTheDocument();
+    expect(screen.getByTestId('token-distribution-mobile')).toHaveTextContent('Treasury');
+    expect(screen.getByTestId('token-distribution-mobile')).toHaveTextContent('MHOOD');
   });
 });

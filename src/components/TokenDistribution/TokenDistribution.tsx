@@ -53,6 +53,16 @@ export function TokenDistribution({ mint, presentation }: TokenDistributionProps
           </tbody>
         </table>
       </div>
+      <ul className="allocation-cards" data-testid="token-distribution-mobile">
+        {presentation.projectAllocations.map((entry) => (
+          <li key={entry.id} className="allocation-card">
+            <p className="allocation-card__label">{entry.label}</p>
+            <p className="allocation-card__wallet">{shortenAddress(entry.address, 4)}</p>
+            <p className="allocation-card__amount">{entry.balanceUi} MHOOD</p>
+            <p className="allocation-card__pct">{entry.supplyPercent}</p>
+          </li>
+        ))}
+      </ul>
     </ForestPanel>
   );
 }

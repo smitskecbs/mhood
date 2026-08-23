@@ -63,6 +63,19 @@ export function HolderRanking({
               </tbody>
             </table>
           </div>
+          <ol className="ranking-cards" data-testid="holder-ranking-mobile">
+            {visible.map((entry) => (
+              <li
+                key={entry.wallet}
+                className={`ranking-card${entry.wallet === currentWallet ? ' is-you' : ''}`}
+              >
+                <p className="ranking-card__rank">#{entry.rank}</p>
+                <p className="ranking-card__wallet">{shortenAddress(entry.wallet, 4)}</p>
+                <p className="ranking-card__amount">{entry.balanceUi} MHOOD</p>
+                <p className="ranking-card__pct">{entry.supplyPercent}</p>
+              </li>
+            ))}
+          </ol>
           {showYouOutsideTop && you ? (
             <div className="your-position">
               <p className="forest-panel__eyebrow">{COPY.yourPosition}</p>

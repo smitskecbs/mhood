@@ -40,8 +40,12 @@ describe('HolderRanking', () => {
     );
     expect(screen.getByText('FOREST HOLDERS')).toBeInTheDocument();
     expect(screen.getByText('% Supply')).toBeInTheDocument();
-    expect(screen.getByText('25,400,000 MHOOD')).toBeInTheDocument();
-    expect(screen.getByText('2.54%')).toBeInTheDocument();
+    expect(screen.getAllByText('25,400,000 MHOOD').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('2.54%').length).toBeGreaterThan(0);
+    expect(screen.getByTestId('holder-ranking-mobile')).toBeInTheDocument();
+    expect(screen.getByTestId('holder-ranking-mobile')).toHaveTextContent('#1');
+    expect(screen.getByTestId('holder-ranking-mobile')).toHaveTextContent('1111...1111');
+    expect(screen.queryByText('11111111111111111111111111111111')).not.toBeInTheDocument();
     expect(screen.queryByText(/Development data/)).not.toBeInTheDocument();
   });
 

@@ -23,8 +23,9 @@ export function BurnRanking({ snapshot, loading, error, currentWallet }: BurnRan
         </p>
       ) : null}
       {entries.length > 0 ? (
-        <div className="table-scroll">
-          <table className="forest-table">
+        <>
+          <div className="table-scroll">
+            <table className="forest-table">
               <thead>
                 <tr>
                   <th>Rank</th>
@@ -47,9 +48,29 @@ export function BurnRanking({ snapshot, loading, error, currentWallet }: BurnRan
                     <td>{entry.lastBurn ? new Date(entry.lastBurn * 1000).toLocaleDateString() : '—'}</td>
                   </tr>
                 ))}
-            </tbody>
-          </table>
-        </div>
+              </tbody>
+            </table>
+          </div>
+          <ol className="ranking-cards" data-testid="burn-ranking-mobile">
+            {entries.map((entry) => (
+              <li
+                key={entry.wallet}
+                className={`ranking-card${entry.wallet === currentWallet ? ' is-you' : ''}`}
+              >
+                <p className="ranking-card__head">
+                  #{entry.rank} {shortenAddress(entry.wallet, 4)}
+                  {entry.label ? <span className="wallet-label"> {entry.label}</span> : null}
+                </p>
+                <p className="ranking-card__amount">
+                  {entry.totalBurnedUi} MHOOD · {entry.burns} {entry.burns === 1 ? 'burn' : 'burns'}
+                </p>
+                <p className="ranking-card__meta">
+                  Last burn: {entry.lastBurn ? new Date(entry.lastBurn * 1000).toLocaleDateString() : '—'}
+                </p>
+              </li>
+            ))}
+          </ol>
+        </>
       ) : null}
     </ForestPanel>
   );
