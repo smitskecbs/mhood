@@ -40,6 +40,11 @@ export function gateWalletUiDelayMs(timing: CinematicTiming): number {
   return timing.gateDwellMs;
 }
 
+/** Fail open to Forest if the entry video never starts playing. */
+export const FOREST_ENTRY_WATCHDOG_MS = 3500;
+/** Crossfade from the playing video into background3. */
+export const FOREST_ENTRY_FADE_MS = 1100;
+
 export const FOREST_UI_STAGES = ['identity', 'stats', 'holders', 'tokenomics', 'burns'] as const;
 export type ForestUiStage = (typeof FOREST_UI_STAGES)[number];
 

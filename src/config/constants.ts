@@ -15,6 +15,8 @@ export const BACKGROUNDS = {
   burnSuccess: '/backgrounds/background4.jpg',
 } as const;
 
+export const FOREST_ENTRY_VIDEO = '/backgrounds/forest-entry.mp4';
+
 export const COPY = {
   gateLine: 'THE FOREST DOES NOT OPEN FOR EVERYONE.',
   proveClaim: 'PROVE YOUR CLAIM',

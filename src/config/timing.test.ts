@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   CINEMATIC_TIMING,
+  FOREST_ENTRY_FADE_MS,
+  FOREST_ENTRY_WATCHDOG_MS,
   HOLDER_RANKING_VISIBLE_TOP,
   REDUCED_MOTION_TIMING,
   gateWalletUiDelayMs,
@@ -15,9 +17,13 @@ describe('cinematic timing', () => {
     expect(CINEMATIC_TIMING.walletUiFadeMs).toBeLessThanOrEqual(1200);
   });
 
-  it('shows the Forest without dashboard for several seconds', () => {
+  it('holds ACCESS GRANTED, then allows the Forest entry cinematic', () => {
     expect(CINEMATIC_TIMING.accessGrantedMs).toBeGreaterThanOrEqual(1800);
     expect(CINEMATIC_TIMING.accessGrantedMs).toBeLessThanOrEqual(2500);
+    expect(FOREST_ENTRY_WATCHDOG_MS).toBeGreaterThanOrEqual(2500);
+    expect(FOREST_ENTRY_WATCHDOG_MS).toBeLessThan(10_000);
+    expect(FOREST_ENTRY_FADE_MS).toBeGreaterThanOrEqual(800);
+    expect(FOREST_ENTRY_FADE_MS).toBeLessThanOrEqual(1600);
     expect(CINEMATIC_TIMING.forestDwellMs).toBeGreaterThanOrEqual(4000);
     expect(CINEMATIC_TIMING.forestDwellMs).toBeLessThanOrEqual(5000);
     expect(CINEMATIC_TIMING.forestStageStaggerMs).toBeGreaterThan(0);

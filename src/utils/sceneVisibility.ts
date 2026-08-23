@@ -20,7 +20,7 @@ export function sceneVisualState(scene: ForestScene): SceneVisualState {
   const granted = scene === 'granted';
   const denied = scene === 'denied';
   const gate = scene === 'gate';
-  const forest = scene === 'forestDwell' || scene === 'forest';
+  const forest = scene === 'forestDwell' || scene === 'forest' || scene === 'forestEntry';
   return {
     blackout: granted || gate,
     showGateUi: gate,
@@ -74,7 +74,12 @@ export function sceneActionForAccess(input: {
   if (input.scene === 'denied') return 'gate';
 
   if (input.status !== 'granted' || !input.hasWallet) {
-    if (input.scene === 'forest' || input.scene === 'forestDwell' || input.scene === 'granted') {
+    if (
+      input.scene === 'forest' ||
+      input.scene === 'forestDwell' ||
+      input.scene === 'forestEntry' ||
+      input.scene === 'granted'
+    ) {
       return 'gate';
     }
     return 'none';

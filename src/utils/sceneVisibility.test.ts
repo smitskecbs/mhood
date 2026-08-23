@@ -28,6 +28,17 @@ describe('ACCESS GRANTED scene', () => {
     expect(sceneVisualState('forest').showForestUi).toBe(true);
   });
 
+  it('uses a temporary forest-entry scene before the dashboard', () => {
+    const visuals = sceneVisualState('forestEntry');
+    expect(visuals.showGranted).toBe(false);
+    expect(visuals.showForestUi).toBe(false);
+    expect(visuals.blackout).toBe(false);
+    expect(visuals.forestBackground).toBe(true);
+    expect(visuals.showGateUi).toBe(false);
+    expect(visuals.gateIIVisible).toBe(false);
+    expect(visuals.denied).toBe(false);
+  });
+
   it('keeps the wallet UI hidden during the Gate II cinematic dwell', () => {
     expect(sceneVisualState('gateDwell').walletUiVisible).toBe(false);
     expect(sceneVisualState('gateDwell').walletUiInteractive).toBe(false);
@@ -88,10 +99,18 @@ describe('sceneActionForAccess', () => {
 
   it('keeps an authenticated Forest session after a verified burn overlay', () => {
     expect(sceneActionForAccess({ scene: 'forest', status: 'granted', hasWallet: true })).toBe('none');
+    expect(sceneActionForAccess({ scene: 'forestEntry', status: 'granted', hasWallet: true })).toBe('none');
     expect(sceneVisualState('forest').showForestUi).toBe(true);
+    expect(sceneVisualState('forestEntry').showForestUi).toBe(false);
     expect(sceneVisualState('forest').showGateUi).toBe(false);
     expect(sceneVisualState('forest').introActive).toBe(false);
     expect(sceneVisualState('forest').gateIIVisible).toBe(false);
     expect(sceneVisualState('forest').blackout).toBe(false);
+  });
+
+  it('does not send a denied wallet into the forest-entry video', () => {
+    expect(sceneActionForAccess({ scene: 'gate', status: 'insufficient', hasWallet: true })).toBe('denied');
+    expect(sceneVisualState('denied').forestBackground).toBe(false);
+    expect(sceneVisualState('denied').showGranted).toBe(false);
   });
 });

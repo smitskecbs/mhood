@@ -132,4 +132,14 @@ describe('BackgroundLayers', () => {
     );
     expect(shown.container.querySelector('[data-testid="gate2-atmosphere"]')).toBeNull();
   });
+
+  it('keeps background3 as the normal Forest still image', () => {
+    const { container } = render(
+      <BackgroundLayers introActive={false} gateIIVisible={false} forestVisible />,
+    );
+    expect(container.querySelector('.scene-bg--forest .scene-bg__fit')?.getAttribute('style')).toMatch(
+      /background3\.jpg/,
+    );
+    expect(container.querySelector('video')).toBeNull();
+  });
 });

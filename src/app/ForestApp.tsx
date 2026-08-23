@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { COPY } from '../config/constants';
 import { appConfig, isRealBurnEnabled, formatMintForLog } from '../config/env';
 import { gateWalletUiDelayMs, getCinematicTiming } from '../config/timing';
 import { AccessDeniedScene } from '../components/AccessDenied/AccessDeniedScene';
 import { BackgroundLayers } from '../components/cinematic/BackgroundLayers';
+import { ForestEntryScene } from '../components/cinematic/ForestEntryScene';
 import { ForestDashboard } from '../components/ForestDashboard/ForestDashboard';
 import { AccessDebugPanel } from '../components/layout/AccessDebugPanel';
 import { VerifiedBurnScene } from '../components/VerifiedBurnScene/VerifiedBurnScene';
@@ -16,6 +17,7 @@ import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
 import { findBurnRank } from '../services/burnRankingService';
 import { clearMintCache } from '../services/solana/mintService';
 import { formatTokenAmount, uiAmountToRaw } from '../utils/tokenAmount';
+import { canShowForestEntry, nextSceneAfterGranted, sceneAfterForestEntry } from '../utils/forestEntry';
 import { sceneActionForAccess, sceneVisualState } from '../utils/sceneVisibility';
 import { logWalletUiReady, markGateIIStart } from '../utils/gateTiming';
 import { resetHolderVerification } from '../utils/walletInteraction';
@@ -35,7 +37,13 @@ export function ForestApp() {
   const [forestVisible, setForestVisible] = useState(false);
   const [preferPicker, setPreferPicker] = useState(false);
   const [verifiedBurn, setVerifiedBurn] = useState<VerifiedBurnSuccess | null>(null);
+  const [grantedLeaving, setGrantedLeaving] = useState(false);
+  const [entryPlaying, setEntryPlaying] = useState(false);
+  const sceneRef = useRef(scene);
+  sceneRef.current = scene;
   const visuals = sceneVisualState(scene);
+  const showForestEntry = canShowForestEntry({ scene, status, reducedMotion });
+  const entryBlackout = scene === 'forestEntry' && !entryPlaying;
 
   const thresholdLabel = mint
     ? formatTokenAmount(uiAmountToRaw(appConfig.accessThresholdUi, mint.decimals), mint.decimals)
@@ -84,6 +92,7 @@ export function ForestApp() {
 
     if (action === 'denied') {
       setForestVisible(false);
+      setEntryPlaying(false);
       if (scene === 'denied') return;
       const hide = window.setTimeout(() => setScene('denied'), timing.walletUiFadeMs);
       return () => window.clearTimeout(hide);
@@ -91,6 +100,7 @@ export function ForestApp() {
 
     if (action === 'gate') {
       setVerifiedBurn(null);
+      setEntryPlaying(false);
       setForestVisible(false);
       setScene('gate');
       return;
@@ -98,17 +108,33 @@ export function ForestApp() {
 
     if (action === 'granted') {
       if (scene === 'granted') return;
+      setVerifiedBurn(null);
+      setEntryPlaying(false);
       const hide = window.setTimeout(() => setScene('granted'), timing.walletUiFadeMs);
       return () => window.clearTimeout(hide);
     }
   }, [status, wallet, scene, timing.walletUiFadeMs]);
 
   useEffect(() => {
-    if (scene !== 'granted') return;
+    if (scene !== 'granted') {
+      setGrantedLeaving(false);
+      return;
+    }
     setForestVisible(false);
-    const hold = window.setTimeout(() => setScene('forestDwell'), timing.accessGrantedMs);
-    return () => window.clearTimeout(hold);
-  }, [scene, timing.accessGrantedMs]);
+    setEntryPlaying(false);
+    const fadeMs = Math.min(800, timing.accessGrantedMs);
+    const leave = window.setTimeout(() => setGrantedLeaving(true), Math.max(0, timing.accessGrantedMs - fadeMs));
+    const hold = window.setTimeout(() => setScene(nextSceneAfterGranted(reducedMotion)), timing.accessGrantedMs);
+    return () => {
+      window.clearTimeout(leave);
+      window.clearTimeout(hold);
+    };
+  }, [scene, timing.accessGrantedMs, reducedMotion]);
+
+  useEffect(() => {
+    if (scene !== 'forestEntry') return;
+    setForestVisible(true);
+  }, [scene]);
 
   useEffect(() => {
     if (scene !== 'forestDwell') return;
@@ -132,10 +158,18 @@ export function ForestApp() {
 
   function returnToForestFromBurn() {
     setVerifiedBurn(null);
+    setEntryPlaying(false);
     if (scene === 'forest') {
       setForestVisible(true);
     }
     void refreshAll();
+  }
+
+  function completeForestEntry() {
+    if (sceneRef.current !== 'forestEntry') return;
+    setEntryPlaying(false);
+    setForestVisible(true);
+    setScene(sceneAfterForestEntry());
   }
 
   function advanceIntro() {
@@ -156,7 +190,7 @@ export function ForestApp() {
 
   return (
     <main
-      className={`app-root${verifiedBurn ? ' is-burn-success' : ''}`}
+      className={`app-root${verifiedBurn ? ' is-burn-success' : ''}${showForestEntry ? ' is-forest-entry' : ''}`}
       style={{ ['--wallet-ui-fade-ms' as string]: `${timing.walletUiFadeMs}ms` }}
     >
       <BackgroundLayers
@@ -167,10 +201,10 @@ export function ForestApp() {
         denied={visuals.denied}
         forestVisible={forestVisible && visuals.forestBackground}
         burnSuccessVisible={Boolean(verifiedBurn)}
-        blackout={visuals.blackout}
+        blackout={visuals.blackout || entryBlackout}
       />
 
-      {!visuals.showGranted && !isRealBurnEnabled() ? (
+      {!visuals.showGranted && !showForestEntry && !isRealBurnEnabled() ? (
         <div className="dev-ribbon">Simulation mode — real burns locked</div>
       ) : null}
 
@@ -205,9 +239,13 @@ export function ForestApp() {
       />
 
       {visuals.showGranted ? (
-        <div className="granted-overlay" data-testid="granted-overlay">
+        <div className={`granted-overlay${grantedLeaving ? ' is-leaving' : ''}`} data-testid="granted-overlay">
           <p className="granted-text">{COPY.granted}</p>
         </div>
+      ) : null}
+
+      {showForestEntry ? (
+        <ForestEntryScene onPlaying={() => setEntryPlaying(true)} onFinished={completeForestEntry} />
       ) : null}
 
       {showForestUi && mint && balance ? (
@@ -236,7 +274,7 @@ export function ForestApp() {
         />
       ) : null}
 
-      {!visuals.showGranted ? (
+      {!visuals.showGranted && !showForestEntry ? (
         <AccessDebugPanel
           wallet={wallet}
           status={status}

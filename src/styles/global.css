@@ -355,6 +355,53 @@ input {
   place-items: center;
 }
 
+.granted-overlay.is-leaving {
+  animation: granted-overlay-out 0.8s ease forwards;
+  pointer-events: none;
+}
+
+.forest-entry {
+  position: fixed;
+  inset: 0;
+  z-index: 8;
+  overflow: hidden;
+  pointer-events: none;
+  background: #000;
+  animation: forest-entry-in 0.9s ease both;
+}
+
+.forest-entry.is-leaving {
+  animation: forest-entry-out 1.1s ease forwards;
+}
+
+.forest-entry__fill {
+  position: absolute;
+  inset: 0;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+  filter: blur(28px) brightness(0.38) saturate(0.85);
+  transform: scale(1.12);
+}
+
+.forest-entry__fit {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.forest-entry__video {
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  object-position: center center;
+  background: transparent;
+}
+
 .gate-shell {
   pointer-events: auto;
   animation: gate-ui-in var(--wallet-ui-fade-ms, 1.2s) ease;
@@ -573,6 +620,33 @@ a.wallet-picker__button {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes granted-overlay-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes forest-entry-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes forest-entry-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
   }
 }
 
@@ -1368,12 +1442,18 @@ a.wallet-picker__button {
   .burn-success__flame,
   .burn-success__amount,
   .burn-success__pulse,
-  .burn-success__ember {
+  .burn-success__ember,
+  .forest-entry {
     animation: none;
     opacity: 1;
     transform: none;
     filter: none;
     pointer-events: auto;
+  }
+
+  .forest-entry {
+    display: none;
+    pointer-events: none;
   }
 
   .burn-success__pulse,
@@ -1503,6 +1583,20 @@ a.wallet-picker__button {
 
   .granted-text {
     font-size: clamp(2.1rem, 10vw, 3.2rem);
+  }
+
+  .forest-entry,
+  .forest-entry__fit,
+  .forest-entry__video {
+    max-width: 100vw;
+    overflow: hidden;
+  }
+
+  .forest-entry__video {
+    --fit-scale: 1.08;
+    transform: scale(var(--fit-scale));
+    transform-origin: center center;
+    object-fit: contain;
   }
 
   .burn-success {

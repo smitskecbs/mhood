@@ -106,6 +106,7 @@ export type ForestScene =
   | 'gate'
   | 'denied'
   | 'granted'
+  | 'forestEntry'
   | 'forestDwell'
   | 'forest';
 

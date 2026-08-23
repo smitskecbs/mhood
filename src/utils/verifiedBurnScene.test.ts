@@ -63,6 +63,7 @@ describe('verified burn success scene', () => {
     expect(staysOnAuthenticatedForest('intro', 'granted')).toBe(false);
     expect(staysOnAuthenticatedForest('gate', 'granted')).toBe(false);
     expect(staysOnAuthenticatedForest('gateDwell', 'granted')).toBe(false);
+    expect(staysOnAuthenticatedForest('forestEntry', 'granted')).toBe(false);
     expect(staysOnAuthenticatedForest('forest', 'disconnected')).toBe(false);
   });
 });
