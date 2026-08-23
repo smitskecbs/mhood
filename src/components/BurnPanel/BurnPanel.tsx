@@ -19,6 +19,7 @@ import { submitVerifiedBurnSignature } from '../../services/verifiedBurnClient';
 import { burnErrorLog, burnLog } from '../../utils/burnLog';
 import { explorerTxUrl, shortenAddress } from '../../utils/format';
 import { formatTokenAmount, parseBurnAmountInput, percentOf } from '../../utils/tokenAmount';
+import { canShowVerifiedBurnScene, toVerifiedBurnSuccess, type VerifiedBurnSuccess } from '../../utils/verifiedBurnScene';
 import type { BurnErrorCategory, BurnExecutionResult, MintDetails, PreparedBurn, WalletMhoodBalance } from '../../types';
 import { ForestPanel } from '../layout/ForestPanel';
 import { Modal } from '../layout/Modal';
@@ -27,11 +28,12 @@ type BurnPanelProps = {
   mint: MintDetails;
   balance: WalletMhoodBalance;
   onRefreshAfterRealBurn: () => Promise<void>;
+  onVerifiedBurnSuccess?: (success: VerifiedBurnSuccess) => void;
 };
 
 const PERCENTS = [25, 50, 75] as const;
 
-export function BurnPanel({ mint, balance, onRefreshAfterRealBurn }: BurnPanelProps) {
+export function BurnPanel({ mint, balance, onRefreshAfterRealBurn, onVerifiedBurnSuccess }: BurnPanelProps) {
   const { connection } = useConnection();
   const wallet = useWallet();
   const [input, setInput] = useState('');
@@ -148,6 +150,11 @@ export function BurnPanel({ mint, balance, onRefreshAfterRealBurn }: BurnPanelPr
       setInput('');
       if (shouldRefreshAfterVerifiedBurn(next)) {
         await onRefreshAfterRealBurn();
+      }
+      const cinematic = toVerifiedBurnSuccess(next);
+      if (cinematic && onVerifiedBurnSuccess && canShowVerifiedBurnScene(next)) {
+        setResult(null);
+        onVerifiedBurnSuccess(cinematic);
       }
     } catch (err) {
       if (err instanceof RealBurnDisabledError) {

@@ -10,6 +10,7 @@ type BackgroundLayersProps = {
   denied?: boolean;
   blackout?: boolean;
   reducedMotion?: boolean;
+  burnSuccessVisible?: boolean;
 };
 
 function FittedSceneBackground({
@@ -37,25 +38,27 @@ export function BackgroundLayers({
   denied = false,
   blackout = false,
   reducedMotion = false,
+  burnSuccessVisible = false,
 }: BackgroundLayersProps) {
-  const cinematicActive = !blackout && gateIIVisible && !forestVisible && !reducedMotion && !denied;
+  const cinematicActive = !blackout && gateIIVisible && !forestVisible && !reducedMotion && !denied && !burnSuccessVisible;
   const living = cinematicActive && !walletUiVisible;
   const phase = useGateIICinematic(living);
   const displayPhase = living ? phase : 'idle';
   const flicker = !blackout && (introActive || denied) && !reducedMotion;
   const glitch = !blackout && (introActive || living) && !reducedMotion;
   const dimmerVisible = !blackout && !forestVisible && denied;
-  const grainStrong = !blackout && (introActive || cinematicActive || denied);
+  const grainStrong = !blackout && (introActive || cinematicActive || denied || burnSuccessVisible);
   const veilVisible = living && displayPhase === 'fade';
 
   return (
     <div
-      className={`scene-stack ${blackout ? 'is-blackout' : ''} ${denied ? 'is-denied' : ''} ${cinematicActive ? `gate2-${displayPhase}` : ''}`.trim()}
+      className={`scene-stack ${blackout ? 'is-blackout' : ''} ${denied ? 'is-denied' : ''} ${burnSuccessVisible ? 'is-burn-success' : ''} ${cinematicActive ? `gate2-${displayPhase}` : ''}`.trim()}
       aria-hidden="true"
       data-pointer-events="none"
       data-gate2-phase={cinematicActive ? displayPhase : undefined}
       data-denied={denied ? 'true' : undefined}
       data-wallet-blackout={blackout && walletUiVisible ? 'true' : undefined}
+      data-burn-success={burnSuccessVisible ? 'true' : undefined}
     >
       <FittedSceneBackground
         className={`scene-bg--gate-i ${flicker ? 'is-flickering' : ''}`}
@@ -71,6 +74,11 @@ export function BackgroundLayers({
         className="scene-bg--forest"
         src={BACKGROUNDS.forest}
         visible={forestVisible && !blackout}
+      />
+      <FittedSceneBackground
+        className={`scene-bg--burn-success ${burnSuccessVisible && !reducedMotion ? 'is-living' : ''}`}
+        src={BACKGROUNDS.burnSuccess}
+        visible={burnSuccessVisible && !blackout}
       />
       <div className={`scene-dimmer ${dimmerVisible ? 'is-visible' : ''} ${denied ? 'is-denied' : ''}`.trim()} />
       <div className="scene-vignette" />

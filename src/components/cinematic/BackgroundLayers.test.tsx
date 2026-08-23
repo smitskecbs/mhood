@@ -107,4 +107,29 @@ describe('BackgroundLayers', () => {
     expect(container.querySelector('[data-testid="gate2-atmosphere"]')).toBeNull();
     expect(container.querySelector('.gate2-meteor')).toBeNull();
   });
+
+  it('shows background4 only for the verified burn success scene', () => {
+    const hidden = render(
+      <BackgroundLayers introActive={false} gateIIVisible={false} forestVisible />,
+    );
+    expect(hidden.container.querySelector('.scene-bg--burn-success')?.classList.contains('is-visible')).toBe(false);
+    expect(hidden.container.querySelector('.scene-bg--forest')?.classList.contains('is-visible')).toBe(true);
+
+    const shown = render(
+      <BackgroundLayers
+        introActive={false}
+        gateIIVisible={false}
+        forestVisible={false}
+        burnSuccessVisible
+      />,
+    );
+    expect(shown.container.querySelector('.scene-stack')?.getAttribute('data-burn-success')).toBe('true');
+    expect(shown.container.querySelector('.scene-bg--burn-success')?.classList.contains('is-visible')).toBe(true);
+    expect(shown.container.querySelector('.scene-bg--burn-success .scene-bg__fit')).toBeTruthy();
+    expect(shown.container.querySelector('.scene-bg--forest')?.classList.contains('is-visible')).toBe(false);
+    expect(shown.container.querySelector('.scene-bg--burn-success .scene-bg__fit')?.getAttribute('style')).toMatch(
+      /background4\.jpg/,
+    );
+    expect(shown.container.querySelector('[data-testid="gate2-atmosphere"]')).toBeNull();
+  });
 });

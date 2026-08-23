@@ -7,16 +7,19 @@ import { AccessDeniedScene } from '../components/AccessDenied/AccessDeniedScene'
 import { BackgroundLayers } from '../components/cinematic/BackgroundLayers';
 import { ForestDashboard } from '../components/ForestDashboard/ForestDashboard';
 import { AccessDebugPanel } from '../components/layout/AccessDebugPanel';
+import { VerifiedBurnScene } from '../components/VerifiedBurnScene/VerifiedBurnScene';
 import { WalletGate } from '../components/WalletGate/WalletGate';
 import { useBurnRanking } from '../hooks/useBurnRanking';
 import { useForestAccess } from '../hooks/useForestAccess';
 import { useHolderRanking } from '../hooks/useHolderRanking';
 import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
+import { findBurnRank } from '../services/burnRankingService';
 import { clearMintCache } from '../services/solana/mintService';
 import { formatTokenAmount, uiAmountToRaw } from '../utils/tokenAmount';
 import { sceneActionForAccess, sceneVisualState } from '../utils/sceneVisibility';
 import { logWalletUiReady, markGateIIStart } from '../utils/gateTiming';
 import { resetHolderVerification } from '../utils/walletInteraction';
+import type { VerifiedBurnSuccess } from '../utils/verifiedBurnScene';
 import type { ForestScene } from '../types';
 
 export function ForestApp() {
@@ -31,6 +34,7 @@ export function ForestApp() {
   const [gateIIVisible, setGateIIVisible] = useState(false);
   const [forestVisible, setForestVisible] = useState(false);
   const [preferPicker, setPreferPicker] = useState(false);
+  const [verifiedBurn, setVerifiedBurn] = useState<VerifiedBurnSuccess | null>(null);
   const visuals = sceneVisualState(scene);
 
   const thresholdLabel = mint
@@ -86,6 +90,7 @@ export function ForestApp() {
     }
 
     if (action === 'gate') {
+      setVerifiedBurn(null);
       setForestVisible(false);
       setScene('gate');
       return;
@@ -120,6 +125,19 @@ export function ForestApp() {
     await Promise.all([holders.refresh({ bypassCache: true }), burns.refresh()]);
   }
 
+  function openVerifiedBurnScene(success: VerifiedBurnSuccess) {
+    setVerifiedBurn(success);
+    setForestVisible(false);
+  }
+
+  function returnToForestFromBurn() {
+    setVerifiedBurn(null);
+    if (scene === 'forest') {
+      setForestVisible(true);
+    }
+    void refreshAll();
+  }
+
   function advanceIntro() {
     setScene((current) => (current === 'intro' ? 'gateDwell' : current));
   }
@@ -137,7 +155,10 @@ export function ForestApp() {
   }
 
   return (
-    <main className="app-root" style={{ ['--wallet-ui-fade-ms' as string]: `${timing.walletUiFadeMs}ms` }}>
+    <main
+      className={`app-root${verifiedBurn ? ' is-burn-success' : ''}`}
+      style={{ ['--wallet-ui-fade-ms' as string]: `${timing.walletUiFadeMs}ms` }}
+    >
       <BackgroundLayers
         introActive={visuals.introActive}
         reducedMotion={reducedMotion}
@@ -145,6 +166,7 @@ export function ForestApp() {
         walletUiVisible={visuals.walletUiVisible}
         denied={visuals.denied}
         forestVisible={forestVisible && visuals.forestBackground}
+        burnSuccessVisible={Boolean(verifiedBurn)}
         blackout={visuals.blackout}
       />
 
@@ -201,6 +223,16 @@ export function ForestApp() {
           burnLoading={burns.loading}
           burnError={burns.error}
           onRefreshAll={refreshAll}
+          onVerifiedBurnSuccess={openVerifiedBurnScene}
+        />
+      ) : null}
+
+      {verifiedBurn && status === 'granted' && scene === 'forest' ? (
+        <VerifiedBurnScene
+          success={verifiedBurn}
+          burnRank={findBurnRank(burns.snapshot, verifiedBurn.wallet)}
+          reducedMotion={reducedMotion}
+          onBackToForest={returnToForestFromBurn}
         />
       ) : null}
 

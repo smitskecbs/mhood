@@ -24,6 +24,7 @@ describe('mobile background sizing', () => {
     expect(mobileCss).toMatch(/\.scene-bg--gate-i \.scene-bg__fit\s*\{[^}]*--fit-scale:\s*1\.08/);
     expect(mobileCss).toMatch(/\.scene-bg--gate-ii \.scene-bg__fit\s*\{[^}]*--fit-scale:\s*1\.1/);
     expect(mobileCss).toMatch(/\.scene-bg--forest \.scene-bg__fit\s*\{[^}]*--fit-scale:\s*1\.08/);
+    expect(mobileCss).toMatch(/\.scene-bg--burn-success \.scene-bg__fit\s*\{[^}]*--fit-scale:\s*1\.08/);
     expect(mobileCss).not.toMatch(/\.scene-bg--gate-i \.scene-bg__fit\s*\{[^}]*background-size:\s*cover/);
   });
 

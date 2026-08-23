@@ -113,6 +113,19 @@ input {
   transition-duration: 2.2s;
 }
 
+.scene-bg--burn-success {
+  z-index: 2;
+  transition-duration: 2.2s;
+}
+
+.scene-bg--burn-success.is-living .scene-bg__fit {
+  animation: gate-ii-breathe-ambient 12s ease-in-out infinite;
+}
+
+.scene-bg--burn-success.is-living .scene-bg__fill {
+  animation: gate-ii-drift-ambient 18s ease-in-out infinite;
+}
+
 .scene-bg.is-visible {
   opacity: 1;
 }
@@ -309,7 +322,8 @@ input {
 .scene-stack.is-blackout .scene-dimmer,
 .scene-stack.is-blackout .scene-vignette,
 .scene-stack.is-blackout .gate2-fx,
-.scene-stack.is-blackout .scene-black-veil {
+.scene-stack.is-blackout .scene-black-veil,
+.scene-stack.is-blackout .scene-bg--burn-success {
   opacity: 0 !important;
   animation: none !important;
   visibility: hidden;
@@ -626,6 +640,157 @@ a.wallet-picker__button {
   padding: 88px 0 72px;
   display: grid;
   gap: 20px;
+  transition: opacity 1.05s ease;
+}
+
+.app-root.is-burn-success .forest-ui {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.burn-success {
+  position: fixed;
+  inset: 0;
+  z-index: 12;
+  display: grid;
+  place-items: center;
+  padding: max(24px, env(safe-area-inset-top)) 20px max(24px, env(safe-area-inset-bottom));
+  pointer-events: auto;
+  animation: burn-success-in 1.1s ease both;
+}
+
+.burn-success__pulse {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, rgba(143, 181, 106, 0.16) 0%, transparent 58%);
+  animation: burn-success-pulse 2.8s ease-in-out 1;
+}
+
+.burn-success__embers {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.burn-success__ember {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: rgba(214, 232, 186, 0.55);
+  box-shadow: 0 0 8px rgba(143, 181, 106, 0.35);
+  animation: burn-success-ember 9s ease-in-out infinite;
+}
+
+.burn-success__ember:nth-child(1) { top: 22%; left: 18%; animation-delay: 0.2s; }
+.burn-success__ember:nth-child(2) { top: 38%; left: 78%; animation-delay: 1.1s; }
+.burn-success__ember:nth-child(3) { top: 58%; left: 12%; animation-delay: 0.6s; }
+.burn-success__ember:nth-child(4) { top: 70%; left: 72%; animation-delay: 1.8s; }
+.burn-success__ember:nth-child(5) { top: 16%; left: 54%; animation-delay: 2.4s; }
+.burn-success__ember:nth-child(6) { top: 80%; left: 42%; animation-delay: 0.9s; }
+
+.burn-success__card {
+  position: relative;
+  z-index: 1;
+  width: min(520px, 100%);
+  max-width: 100%;
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 36px 28px 28px;
+  text-align: center;
+  background: rgba(4, 8, 6, 0.9);
+  border: 1px solid rgba(182, 224, 138, 0.38);
+  border-radius: 22px;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow:
+    0 0 56px rgba(143, 181, 106, 0.22),
+    0 24px 60px rgba(0, 0, 0, 0.5);
+}
+
+.burn-success__kicker {
+  margin: 0;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  font-size: 0.78rem;
+  color: var(--moss-strong);
+  animation: burn-success-rise 0.9s ease 0.35s both;
+}
+
+.burn-success__flame {
+  margin: 8px 0 0;
+  font-size: 2rem;
+  animation: burn-success-rise 0.9s ease 0.55s both;
+}
+
+.burn-success__amount {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: clamp(2.1rem, 6vw, 3.4rem);
+  line-height: 1.1;
+  color: var(--ink);
+  text-shadow: 0 0 28px rgba(143, 181, 106, 0.35);
+  animation: burn-success-rise 0.95s ease 0.75s both;
+}
+
+.burn-success__burned {
+  margin: 0 0 8px;
+  letter-spacing: 0.22em;
+  font-size: 0.82rem;
+  color: var(--gold);
+  animation: burn-success-rise 0.95s ease 0.85s both;
+}
+
+.burn-success__label,
+.burn-success__status,
+.burn-success__rank {
+  margin: 0;
+  color: var(--muted);
+  animation: burn-success-rise 0.9s ease 1.15s both;
+}
+
+.burn-success__signature {
+  margin: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  color: var(--ink);
+  animation: burn-success-rise 0.9s ease 1.15s both;
+}
+
+.burn-success__card .forest-button,
+.burn-success__card a.forest-button {
+  width: min(100%, 320px);
+  min-height: 44px;
+  text-decoration: none;
+  display: grid;
+  place-items: center;
+  animation: burn-success-rise 0.9s ease 1.35s both;
+}
+
+.burn-success__status {
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--moss);
+  font-size: 0.72rem;
+}
+
+.burn-success.is-reduced,
+.burn-success.is-reduced .burn-success__kicker,
+.burn-success.is-reduced .burn-success__flame,
+.burn-success.is-reduced .burn-success__amount,
+.burn-success.is-reduced .burn-success__burned,
+.burn-success.is-reduced .burn-success__label,
+.burn-success.is-reduced .burn-success__signature,
+.burn-success.is-reduced .burn-success__status,
+.burn-success.is-reduced .burn-success__rank,
+.burn-success.is-reduced .burn-success__card .forest-button,
+.burn-success.is-reduced .burn-success__card a.forest-button {
+  animation: none;
+  opacity: 1;
+  transform: none;
 }
 
 .forest-header h1 {
@@ -1138,6 +1303,34 @@ a.wallet-picker__button {
   50% { opacity: 1; }
 }
 
+@keyframes burn-success-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes burn-success-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes burn-success-pulse {
+  0% { opacity: 0; }
+  35% { opacity: 1; }
+  100% { opacity: 0.22; }
+}
+
+@keyframes burn-success-ember {
+  0%,
+  100% { transform: translate(0, 0); opacity: 0.18; }
+  50% { transform: translate(6px, -18px); opacity: 0.55; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .scene-bg {
     transition-duration: 0.45s;
@@ -1169,12 +1362,30 @@ a.wallet-picker__button {
   .granted-text,
   .denied-overlay,
   .forest-stage,
-  .ledger-reading {
+  .ledger-reading,
+  .burn-success,
+  .burn-success__kicker,
+  .burn-success__flame,
+  .burn-success__amount,
+  .burn-success__pulse,
+  .burn-success__ember {
     animation: none;
     opacity: 1;
     transform: none;
     filter: none;
     pointer-events: auto;
+  }
+
+  .burn-success__pulse,
+  .burn-success__embers,
+  .scene-bg--burn-success.is-living .scene-bg__fit,
+  .scene-bg--burn-success.is-living .scene-bg__fill {
+    animation: none !important;
+    opacity: 0;
+  }
+
+  .app-root.is-burn-success .forest-ui {
+    transition-duration: 0.45s;
   }
 
   .forest-panel,
@@ -1292,6 +1503,33 @@ a.wallet-picker__button {
 
   .granted-text {
     font-size: clamp(2.1rem, 10vw, 3.2rem);
+  }
+
+  .burn-success {
+    min-height: 100dvh;
+    min-height: 100svh;
+    place-items: center;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+
+  .burn-success__card {
+    width: min(92vw, 430px);
+    max-width: 92vw;
+    max-height: min(90dvh, calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 24px));
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 28px 22px 24px;
+  }
+
+  .burn-success__amount {
+    font-size: clamp(1.9rem, 9vw, 2.8rem);
+  }
+
+  .burn-success__card .forest-button,
+  .burn-success__card a.forest-button {
+    min-height: 48px;
+    width: 100%;
   }
 
   .denied-title {
@@ -1429,6 +1667,11 @@ a.wallet-picker__button {
   }
 
   .scene-bg--forest .scene-bg__fit {
+    --fit-scale: 1.08;
+    transform: scale(var(--fit-scale));
+  }
+
+  .scene-bg--burn-success .scene-bg__fit {
     --fit-scale: 1.08;
     transform: scale(var(--fit-scale));
   }

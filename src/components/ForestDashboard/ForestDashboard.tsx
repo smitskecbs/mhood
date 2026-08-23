@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { findBurnRank, findWalletBurnCount, findWalletBurnedRaw } from '../../services/burnRankingService';
 import { presentHolderRanking, findCommunityWalletRank } from '../../utils/holderPresentation';
+import type { VerifiedBurnSuccess } from '../../utils/verifiedBurnScene';
 import type { BurnRankingSnapshot, HolderRankingSnapshot, MintDetails, WalletMhoodBalance } from '../../types';
 import { BurnPanel } from '../BurnPanel/BurnPanel';
 import { BurnRanking } from '../BurnRanking/BurnRanking';
@@ -21,6 +22,7 @@ type ForestDashboardProps = {
   burnLoading: boolean;
   burnError: string | null;
   onRefreshAll: () => Promise<void>;
+  onVerifiedBurnSuccess: (success: VerifiedBurnSuccess) => void;
 };
 
 export function ForestDashboard({
@@ -35,6 +37,7 @@ export function ForestDashboard({
   burnLoading,
   burnError,
   onRefreshAll,
+  onVerifiedBurnSuccess,
 }: ForestDashboardProps) {
   const presentation = useMemo(
     () => presentHolderRanking(holderSnapshot, mint.decimals, mint.supplyRaw),
@@ -92,7 +95,12 @@ export function ForestDashboard({
             error={burnError}
             currentWallet={balance.wallet}
           />
-          <BurnPanel mint={mint} balance={balance} onRefreshAfterRealBurn={onRefreshAll} />
+          <BurnPanel
+            mint={mint}
+            balance={balance}
+            onRefreshAfterRealBurn={onRefreshAll}
+            onVerifiedBurnSuccess={onVerifiedBurnSuccess}
+          />
         </div>
       </div>
     </div>

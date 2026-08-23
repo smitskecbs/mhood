@@ -12,6 +12,7 @@ export const BACKGROUNDS = {
   gateI: '/backgrounds/background1.jpg',
   gateII: '/backgrounds/background2.jpg',
   forest: '/backgrounds/background3.jpg',
+  burnSuccess: '/backgrounds/background4.jpg',
 } as const;
 
 export const COPY = {
@@ -46,6 +47,13 @@ export const COPY = {
   burnIrreversible: 'This action cannot be reversed.',
   confirmBurn: 'Confirm burn',
   verifiedBurn: 'VERIFIED BURN',
+  burnedWord: 'BURNED',
+  transactionSignature: 'Transaction Signature',
+  copySignature: 'Copy signature',
+  signatureCopied: 'Copied',
+  viewTransaction: 'VIEW TRANSACTION',
+  confirmedOnChain: 'CONFIRMED ON-CHAIN',
+  backToForest: 'BACK TO FOREST',
   burnSuccessTitle: 'RETURNED TO THE FOREST',
   offeringWithdrawn: 'The offering was withdrawn.',
   burnUnconfirmed: 'The forest could not confirm the burn.',

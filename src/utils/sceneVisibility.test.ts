@@ -85,4 +85,13 @@ describe('sceneActionForAccess', () => {
     expect(sceneActionForAccess({ scene: 'intro', status: 'insufficient', hasWallet: true })).toBe('none');
     expect(sceneActionForAccess({ scene: 'gateDwell', status: 'insufficient', hasWallet: true })).toBe('none');
   });
+
+  it('keeps an authenticated Forest session after a verified burn overlay', () => {
+    expect(sceneActionForAccess({ scene: 'forest', status: 'granted', hasWallet: true })).toBe('none');
+    expect(sceneVisualState('forest').showForestUi).toBe(true);
+    expect(sceneVisualState('forest').showGateUi).toBe(false);
+    expect(sceneVisualState('forest').introActive).toBe(false);
+    expect(sceneVisualState('forest').gateIIVisible).toBe(false);
+    expect(sceneVisualState('forest').blackout).toBe(false);
+  });
 });
