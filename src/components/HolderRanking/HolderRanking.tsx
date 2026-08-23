@@ -79,7 +79,7 @@ export function HolderRanking({
             ))}
           </ol>
           {showYouOutsideTop && you ? (
-            <div className="your-position" data-testid="your-position">
+            <div className="your-position forest-pop" data-testid="your-position">
               <p className="forest-panel__eyebrow">{COPY.yourPosition}</p>
               <p className="your-position__rank">#{you.rank}</p>
               <p className="your-position__wallet">{shortenAddress(you.wallet, 4)}</p>

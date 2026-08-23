@@ -16,29 +16,19 @@ describe('useGateIICinematic', () => {
     expect(result.current).toBe('ambient');
 
     act(() => {
-      vi.advanceTimersByTime(1_999);
+      vi.advanceTimersByTime(4_999);
     });
     expect(result.current).toBe('ambient');
 
     act(() => {
       vi.advanceTimersByTime(1);
     });
-    expect(result.current).toBe('awakening');
+    expect(result.current).toBe('disturbance');
 
     act(() => {
       vi.advanceTimersByTime(3_000);
     });
-    expect(result.current).toBe('activation');
-
-    act(() => {
-      vi.advanceTimersByTime(2_000);
-    });
-    expect(result.current).toBe('climax');
-
-    act(() => {
-      vi.advanceTimersByTime(2_200);
-    });
-    expect(result.current).toBe('dim');
+    expect(result.current).toBe('fade');
   });
 
   it('clears timers on unmount so Strict Mode cannot double-run the sequence', () => {
@@ -57,7 +47,7 @@ describe('useGateIICinematic', () => {
     act(() => {
       vi.advanceTimersByTime(5_000);
     });
-    expect(result.current).toBe('activation');
+    expect(result.current).toBe('disturbance');
     rerender({ active: false });
     expect(result.current).toBe('idle');
   });

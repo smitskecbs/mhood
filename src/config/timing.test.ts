@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   CINEMATIC_TIMING,
+  HOLDER_RANKING_VISIBLE_TOP,
   REDUCED_MOTION_TIMING,
   gateWalletUiDelayMs,
   getCinematicTiming,
@@ -10,8 +11,8 @@ describe('cinematic timing', () => {
   it('keeps Gate II on screen for about 10 seconds before the wallet UI', () => {
     expect(CINEMATIC_TIMING.gateDwellMs).toBe(10_000);
     expect(gateWalletUiDelayMs(CINEMATIC_TIMING)).toBe(CINEMATIC_TIMING.gateDwellMs);
-    expect(CINEMATIC_TIMING.walletUiFadeMs).toBeGreaterThanOrEqual(1000);
-    expect(CINEMATIC_TIMING.walletUiFadeMs).toBeLessThanOrEqual(1500);
+    expect(CINEMATIC_TIMING.walletUiFadeMs).toBeGreaterThanOrEqual(800);
+    expect(CINEMATIC_TIMING.walletUiFadeMs).toBeLessThanOrEqual(1200);
   });
 
   it('shows the Forest without dashboard for several seconds', () => {
@@ -29,5 +30,9 @@ describe('cinematic timing', () => {
     expect(reduced.forestDwellMs).toBeLessThan(CINEMATIC_TIMING.forestDwellMs);
     expect(reduced.forestStageStaggerMs).toBe(0);
     expect(gateWalletUiDelayMs(reduced)).toBeLessThan(2000);
+  });
+
+  it('keeps the holder leaderboard at Top 20', () => {
+    expect(HOLDER_RANKING_VISIBLE_TOP).toBe(20);
   });
 });

@@ -41,10 +41,12 @@ export function BackgroundLayers({
   const cinematicActive = !blackout && gateIIVisible && !forestVisible && !reducedMotion && !denied;
   const living = cinematicActive && !walletUiVisible;
   const phase = useGateIICinematic(living);
-  const displayPhase = cinematicActive && walletUiVisible ? 'rest' : phase;
-  const flicker = !blackout && introActive && !reducedMotion;
+  const displayPhase = living ? phase : 'idle';
+  const flicker = !blackout && (introActive || denied) && !reducedMotion;
   const glitch = !blackout && (introActive || living) && !reducedMotion;
-  const dimmerVisible = !blackout && !forestVisible && (walletUiVisible || denied);
+  const dimmerVisible = !blackout && !forestVisible && denied;
+  const grainStrong = !blackout && (introActive || cinematicActive || denied);
+  const veilVisible = living && displayPhase === 'fade';
 
   return (
     <div
@@ -53,6 +55,7 @@ export function BackgroundLayers({
       data-pointer-events="none"
       data-gate2-phase={cinematicActive ? displayPhase : undefined}
       data-denied={denied ? 'true' : undefined}
+      data-wallet-blackout={blackout && walletUiVisible ? 'true' : undefined}
     >
       <FittedSceneBackground
         className={`scene-bg--gate-i ${flicker ? 'is-flickering' : ''}`}
@@ -65,11 +68,6 @@ export function BackgroundLayers({
         visible={gateIIVisible && !blackout}
       />
       <FittedSceneBackground
-        className="scene-bg--gate-i-ghost"
-        src={BACKGROUNDS.gateI}
-        visible={walletUiVisible && !forestVisible && !blackout}
-      />
-      <FittedSceneBackground
         className="scene-bg--forest"
         src={BACKGROUNDS.forest}
         visible={forestVisible && !blackout}
@@ -78,8 +76,12 @@ export function BackgroundLayers({
       <div className="scene-vignette" />
       <div className={`scene-mist ${cinematicActive ? 'is-living' : ''}`} />
       {cinematicActive ? <GateIIAtmosphere phase={displayPhase} /> : null}
-      <div className={`scene-grain ${!blackout && (introActive || cinematicActive) ? 'is-strong' : ''}`} />
+      <div className={`scene-grain ${grainStrong ? 'is-strong' : ''}`} />
       <div className={`scene-glitch ${glitch ? 'is-active' : ''} ${living ? 'is-living' : ''}`} />
+      <div
+        className={`scene-black-veil ${veilVisible ? 'is-visible' : ''}`}
+        data-testid="scene-black-veil"
+      />
     </div>
   );
 }

@@ -4,6 +4,7 @@ import {
   grantedSceneIsBlack,
   sceneActionForAccess,
   sceneVisualState,
+  walletSceneIsBlack,
 } from './sceneVisibility';
 
 describe('ACCESS GRANTED scene', () => {
@@ -31,9 +32,19 @@ describe('ACCESS GRANTED scene', () => {
     expect(sceneVisualState('gateDwell').walletUiVisible).toBe(false);
     expect(sceneVisualState('gateDwell').walletUiInteractive).toBe(false);
     expect(sceneVisualState('gateDwell').gateIIVisible).toBe(true);
+    expect(sceneVisualState('gateDwell').blackout).toBe(false);
     expect(sceneVisualState('gate').walletUiVisible).toBe(true);
     expect(sceneVisualState('gate').walletUiInteractive).toBe(true);
     expect(sceneVisualState('gate').walletUiInteractive).toBe(sceneVisualState('gate').walletUiVisible);
+  });
+
+  it('shows the wallet card only after Gate II has gone fully black', () => {
+    const visuals = sceneVisualState('gate');
+    expect(walletSceneIsBlack(visuals)).toBe(true);
+    expect(visuals.blackout).toBe(true);
+    expect(visuals.gateIIVisible).toBe(false);
+    expect(visuals.showGateUi).toBe(true);
+    expect(visuals.forestBackground).toBe(false);
   });
 });
 
@@ -50,6 +61,7 @@ describe('access denied scene', () => {
     expect(visuals.forestBackground).toBe(false);
     expect(deniedSceneUsesBackground1(visuals)).toBe(true);
     expect(grantedSceneIsBlack(visuals)).toBe(false);
+    expect(walletSceneIsBlack(visuals)).toBe(false);
   });
 });
 

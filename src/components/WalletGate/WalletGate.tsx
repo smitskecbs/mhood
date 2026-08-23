@@ -225,10 +225,11 @@ export function WalletGate({
 
   return (
     <div
-      className={`gate-shell is-interactive${leaving ? ' is-leaving' : ''}`}
+      className={`gate-shell gate-shell--on-black is-interactive${leaving ? ' is-leaving' : ''}`}
       data-wallet-interactive="true"
       data-wallet-visible="true"
       data-wallet-centered="true"
+      data-wallet-black-scene="true"
     >
       <div className="gate-card" data-testid="wallet-gate-card">
         <p className="gate-kicker">Gate II</p>

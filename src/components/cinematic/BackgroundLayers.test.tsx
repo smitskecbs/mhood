@@ -1,6 +1,6 @@
-import { render } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
-import { GATE_II_METEORS, GATE_II_PARTICLES } from '../../config/gateIICinematic';
+import { act, render } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { GATE_II_PARTICLES } from '../../config/gateIICinematic';
 import { BackgroundLayers } from './BackgroundLayers';
 
 describe('BackgroundLayers', () => {
@@ -15,34 +15,57 @@ describe('BackgroundLayers', () => {
     expect(container.querySelectorAll('.scene-bg--forest .scene-bg__fit')).toHaveLength(1);
   });
 
-  it('starts Gate II ambient life immediately and keeps the wallet UI off-screen', () => {
+  it('starts Gate II ambient life immediately without meteors or a wallet overlay', () => {
     const living = render(
       <BackgroundLayers introActive={false} gateIIVisible forestVisible={false} />,
     );
     expect(living.container.querySelector('.scene-bg--gate-ii')?.classList.contains('is-living')).toBe(true);
     expect(living.container.querySelector('.scene-stack')?.getAttribute('data-gate2-phase')).toBe('ambient');
     expect(living.container.querySelectorAll('.gate2-particle')).toHaveLength(GATE_II_PARTICLES.length);
-    expect(living.container.querySelectorAll('.gate2-meteor')).toHaveLength(GATE_II_METEORS.length);
-    expect(living.container.querySelector('.scene-bg--gate-i-ghost')?.classList.contains('is-visible')).toBe(false);
+    expect(living.container.querySelector('.gate2-meteor')).toBeNull();
+    expect(living.container.querySelector('.gate2-ray')).toBeNull();
+    expect(living.container.querySelector('.scene-bg--gate-i-ghost')).toBeNull();
     expect(living.container.querySelector('.scene-dimmer')?.classList.contains('is-visible')).toBe(false);
+    expect(living.container.querySelector('[data-testid="scene-black-veil"]')?.classList.contains('is-visible')).toBe(
+      false,
+    );
   });
 
-  it('dims busy effects when the wallet UI appears', () => {
+  it('covers Gate II with a black veil from 8s so the wallet never sits on background2', () => {
+    vi.useFakeTimers();
+    const { container } = render(
+      <BackgroundLayers introActive={false} gateIIVisible forestVisible={false} />,
+    );
+    act(() => {
+      vi.advanceTimersByTime(7_999);
+    });
+    expect(container.querySelector('.scene-stack')?.getAttribute('data-gate2-phase')).toBe('disturbance');
+    expect(container.querySelector('[data-testid="scene-black-veil"]')?.classList.contains('is-visible')).toBe(false);
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(container.querySelector('.scene-stack')?.getAttribute('data-gate2-phase')).toBe('fade');
+    expect(container.querySelector('[data-testid="scene-black-veil"]')?.classList.contains('is-visible')).toBe(true);
+    vi.useRealTimers();
+  });
+
+  it('keeps the wallet UI on a black screen with no Gate II or ghost behind it', () => {
     const wallet = render(
       <BackgroundLayers
         introActive={false}
-        gateIIVisible
+        gateIIVisible={false}
         walletUiVisible
         forestVisible={false}
+        blackout
       />,
     );
-    expect(wallet.container.querySelector('.scene-stack')?.getAttribute('data-pointer-events')).toBe('none');
-    expect(wallet.container.querySelector('.scene-stack')?.getAttribute('data-gate2-phase')).toBe('rest');
-    expect(wallet.container.querySelector('.scene-bg--gate-ii')?.classList.contains('is-living')).toBe(true);
-    expect(wallet.container.querySelector('.scene-bg--gate-i-ghost')?.classList.contains('is-visible')).toBe(true);
-    expect(wallet.container.querySelector('.scene-dimmer')?.classList.contains('is-visible')).toBe(true);
+    expect(wallet.container.querySelector('.scene-stack')?.classList.contains('is-blackout')).toBe(true);
+    expect(wallet.container.querySelector('.scene-stack')?.getAttribute('data-wallet-blackout')).toBe('true');
+    expect(wallet.container.querySelector('.scene-bg--gate-ii')?.classList.contains('is-visible')).toBe(false);
+    expect(wallet.container.querySelector('.scene-bg--gate-i')?.classList.contains('is-visible')).toBe(false);
+    expect(wallet.container.querySelector('.scene-bg--gate-i-ghost')).toBeNull();
+    expect(wallet.container.querySelector('[data-testid="gate2-atmosphere"]')).toBeNull();
     expect(wallet.container.querySelector('.gate2-meteor')).toBeNull();
-    expect(wallet.container.querySelector('.gate2-fx')?.classList.contains('is-quiet')).toBe(true);
   });
 
   it('hides every photographic layer during ACCESS GRANTED blackout', () => {
@@ -53,7 +76,6 @@ describe('BackgroundLayers', () => {
     expect(container.querySelector('.scene-bg--gate-i')?.classList.contains('is-visible')).toBe(false);
     expect(container.querySelector('.scene-bg--gate-ii')?.classList.contains('is-visible')).toBe(false);
     expect(container.querySelector('.scene-bg--forest')?.classList.contains('is-visible')).toBe(false);
-    expect(container.querySelector('.scene-bg--gate-i-ghost')?.classList.contains('is-visible')).toBe(false);
     expect(container.querySelector('[data-testid="gate2-atmosphere"]')).toBeNull();
   });
 
@@ -71,7 +93,6 @@ describe('BackgroundLayers', () => {
     expect(container.querySelector('.scene-stack')?.classList.contains('is-blackout')).toBe(false);
     expect(container.querySelector('.scene-bg--gate-i')?.classList.contains('is-visible')).toBe(true);
     expect(container.querySelector('.scene-bg--gate-ii')?.classList.contains('is-visible')).toBe(false);
-    expect(container.querySelector('.scene-bg--gate-i-ghost')?.classList.contains('is-visible')).toBe(false);
     expect(container.querySelector('.scene-dimmer')?.classList.contains('is-denied')).toBe(true);
     expect(container.querySelector('.scene-dimmer')?.classList.contains('is-visible')).toBe(true);
   });

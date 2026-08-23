@@ -19,24 +19,37 @@ export type AccessSceneAction = 'none' | 'denied' | 'gate' | 'granted';
 export function sceneVisualState(scene: ForestScene): SceneVisualState {
   const granted = scene === 'granted';
   const denied = scene === 'denied';
+  const gate = scene === 'gate';
   const forest = scene === 'forestDwell' || scene === 'forest';
   return {
-    blackout: granted,
-    showGateUi: scene === 'gate',
+    blackout: granted || gate,
+    showGateUi: gate,
     showGranted: granted,
     showDenied: denied,
     denied,
     showForestUi: scene === 'forest',
     introActive: scene === 'intro',
-    gateIIVisible: scene === 'gateDwell' || scene === 'gate',
-    walletUiVisible: scene === 'gate',
-    walletUiInteractive: scene === 'gate',
+    gateIIVisible: scene === 'gateDwell',
+    walletUiVisible: gate,
+    walletUiInteractive: gate,
     forestBackground: forest,
   };
 }
 
 export function grantedSceneIsBlack(visuals: SceneVisualState): boolean {
   return visuals.blackout && visuals.showGranted && !visuals.forestBackground && !visuals.showGateUi;
+}
+
+export function walletSceneIsBlack(visuals: SceneVisualState): boolean {
+  return (
+    visuals.blackout &&
+    visuals.showGateUi &&
+    visuals.walletUiVisible &&
+    !visuals.gateIIVisible &&
+    !visuals.forestBackground &&
+    !visuals.showGranted &&
+    !visuals.denied
+  );
 }
 
 export function deniedSceneUsesBackground1(visuals: SceneVisualState): boolean {

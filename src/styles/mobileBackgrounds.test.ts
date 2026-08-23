@@ -18,10 +18,13 @@ describe('mobile background sizing', () => {
     expect(css).toMatch(/\.scene-bg__fit\s*\{[^}]*background-size:\s*contain/s);
   });
 
-  it('does not crop Gate/Forest artwork with cover on small screens', () => {
+  it('scales the mobile foreground slightly without switching to cover', () => {
     const mobileCss = css.slice(css.indexOf('@media (max-width: 720px)'));
     expect(mobileCss).toMatch(/scene-bg--fitted \.scene-bg__fit[\s\S]*background-size:\s*contain/);
-    expect(mobileCss).not.toMatch(/scene-bg--gate-i \.scene-bg__fit[\s\S]*background-size:\s*cover/);
+    expect(mobileCss).toMatch(/\.scene-bg--gate-i \.scene-bg__fit\s*\{[^}]*--fit-scale:\s*1\.08/);
+    expect(mobileCss).toMatch(/\.scene-bg--gate-ii \.scene-bg__fit\s*\{[^}]*--fit-scale:\s*1\.1/);
+    expect(mobileCss).toMatch(/\.scene-bg--forest \.scene-bg__fit\s*\{[^}]*--fit-scale:\s*1\.08/);
+    expect(mobileCss).not.toMatch(/\.scene-bg--gate-i \.scene-bg__fit\s*\{[^}]*background-size:\s*cover/);
   });
 
   it('uses dynamic viewport height and safe-area insets for overlays', () => {

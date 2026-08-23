@@ -92,7 +92,9 @@ export function ForestApp() {
     }
 
     if (action === 'granted') {
-      setScene('granted');
+      if (scene === 'granted') return;
+      const hide = window.setTimeout(() => setScene('granted'), timing.walletUiFadeMs);
+      return () => window.clearTimeout(hide);
     }
   }, [status, wallet, scene, timing.walletUiFadeMs]);
 
@@ -146,7 +148,7 @@ export function ForestApp() {
         blackout={visuals.blackout}
       />
 
-      {!visuals.blackout && !isRealBurnEnabled() ? (
+      {!visuals.showGranted && !isRealBurnEnabled() ? (
         <div className="dev-ribbon">Simulation mode — real burns locked</div>
       ) : null}
 
@@ -159,7 +161,7 @@ export function ForestApp() {
       <WalletGate
         visible={visuals.showGateUi}
         preferPicker={preferPicker}
-        leaving={status === 'insufficient' && scene === 'gate'}
+        leaving={(status === 'insufficient' || status === 'granted') && scene === 'gate'}
         status={status}
         mint={mint}
         balance={balance}
@@ -202,7 +204,7 @@ export function ForestApp() {
         />
       ) : null}
 
-      {!visuals.blackout ? (
+      {!visuals.showGranted ? (
         <AccessDebugPanel
           wallet={wallet}
           status={status}

@@ -42,6 +42,8 @@ describe('WalletGate disconnected', () => {
     );
     expect(screen.getByText('THE FOREST DOES NOT OPEN FOR EVERYONE.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /open the gate/i })).toBeInTheDocument();
+    expect(document.querySelector('.gate-shell')?.getAttribute('data-wallet-black-scene')).toBe('true');
+    expect(document.querySelector('.gate-shell')?.classList.contains('gate-shell--on-black')).toBe(true);
   });
 });
 

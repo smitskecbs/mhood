@@ -12,7 +12,7 @@ export type CinematicTiming = {
 export const CINEMATIC_TIMING: CinematicTiming = {
   introHoldMs: 2400,
   gateCrossfadeMs: 2800,
-  /** Gate II cinematic sequence before the wallet UI, including the Gate I crossfade. */
+  /** Gate II: 0–5s read, 5–8s noise/darken, 8–10s fade to black, then wallet. */
   gateDwellMs: 10_000,
   walletUiFadeMs: 1200,
   accessGrantedMs: 2200,
